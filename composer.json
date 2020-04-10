@@ -1,0 +1,41 @@
+{
+    "name": "norgul/laravel-stomp",
+    "description": "Laravel Stomp driver",
+    "keywords": [
+        "php",
+        "laravel",
+        "driver",
+        "stomp",
+        "queue"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Marko Dupor",
+            "email": "marko.dupor@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^7.4",
+        "illuminate/support": "^7.5",
+        "illuminate/queue": "^7.5",
+        "stomp-php/stomp-php": "^4.5",
+        "illuminate/contracts": "^7.5"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8.5",
+        "mockery/mockery": "^1.3.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Norgul\\Stomp\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Norgul\\Stomp\\StompServiceProvider"
+            ]
+        }
+    }
+}
