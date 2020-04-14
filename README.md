@@ -82,3 +82,9 @@ whether you actually have ``STOMP_HOST`` set or not.
 
 That being said, it is best that you don't override config as 
 everything needed by library to run is exposed via env variables.
+
+## Usage
+
+You can use library now like being native Laravel queue. 
+For usage you can check 
+[official Laravel queue documentation](https://laravel.com/docs/7.x/queues)
