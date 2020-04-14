@@ -13,6 +13,7 @@ use Stomp\Transport\Message;
 
 class StompQueue extends Queue implements QueueInterface
 {
+    public string $protocol;
     public string $host;
     public string $port;
     public string $username;
@@ -34,16 +35,17 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function __construct()
     {
+        $this->protocol = Config::get('queue.connections.stomp.protocol');
         $this->host = Config::get('queue.connections.stomp.host');
         $this->port = Config::get('queue.connections.stomp.port');
         $this->username = Config::get('queue.connections.stomp.username');
         $this->password = Config::get('queue.connections.stomp.password');
         $this->queue = Config::get('queue.connections.stomp.queue');
 
-        $connection = new Connection($this->host);
+        $connection = new Connection("$this->protocol://$this->host");
         $client = new Client($connection);
 
-        if($this->username && $this->password){
+        if ($this->username && $this->password) {
             $client->setLogin($this->username, $this->password);
         }
 
