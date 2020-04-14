@@ -2,7 +2,8 @@
 
 namespace Norgul\Stomp\Queue;
 
-use Illuminate\Contracts\Queue\Queue;
+use Illuminate\Contracts\Queue\Queue as QueueInterface;
+use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Config;
 use Stomp\Client;
 use Stomp\Exception\ConnectionException;
@@ -10,7 +11,7 @@ use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Message;
 
-class StompQueue implements Queue
+class StompQueue extends Queue implements QueueInterface
 {
     public string $host;
     public string $port;
@@ -40,8 +41,13 @@ class StompQueue implements Queue
         $this->queue = Config::get('queue.connections.stomp.queue');
 
         $connection = new Connection($this->host);
-        $this->stompPHP = new StatefulStomp(new Client($connection));
+        $client = new Client($connection);
 
+        if($this->username && $this->password){
+            $client->setLogin($this->username, $this->password);
+        }
+
+        $this->stompPHP = new StatefulStomp($client);
     }
 
     /**
@@ -53,6 +59,7 @@ class StompQueue implements Queue
     public function size($queue = null)
     {
         // TODO: Implement size() method.
+        return 1;
     }
 
     /**
@@ -65,20 +72,7 @@ class StompQueue implements Queue
      */
     public function push($job, $data = '', $queue = null)
     {
-        // TODO: Implement push() method.
-    }
-
-    /**
-     * Push a new job onto the queue.
-     *
-     * @param string $queue
-     * @param string|object $job
-     * @param mixed $data
-     * @return mixed
-     */
-    public function pushOn($queue, $job, $data = '')
-    {
-        // TODO: Implement pushOn() method.
+        return $this->pushRaw($this->createPayload($job, $data), $queue);
     }
 
     /**
@@ -93,7 +87,7 @@ class StompQueue implements Queue
     {
         // TODO: check...options are headers. Is this correct?
         $message = new Message($payload, $options);
-        return $this->stompPHP->send($queue ?: $this->queue, $message);
+        return $this->stompPHP->send($this->getQueue($queue), $message);
     }
 
     /**
@@ -107,34 +101,8 @@ class StompQueue implements Queue
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
-        // TODO: Implement later() method.
-    }
-
-    /**
-     * Push a new job onto the queue after a delay.
-     *
-     * @param string $queue
-     * @param \DateTimeInterface|\DateInterval|int $delay
-     * @param string|object $job
-     * @param mixed $data
-     * @return mixed
-     */
-    public function laterOn($queue, $delay, $job, $data = '')
-    {
-        // TODO: Implement laterOn() method.
-    }
-
-    /**
-     * Push an array of jobs onto the queue.
-     *
-     * @param array $jobs
-     * @param mixed $data
-     * @param string|null $queue
-     * @return mixed
-     */
-    public function bulk($jobs, $data = '', $queue = null)
-    {
-        // TODO: Implement bulk() method.
+        $payload = $this->createPayload($job, $data, $queue);
+        return $this->pushRaw($payload, $queue); //, $this->makeDelayHeader($delay));
     }
 
     /**
@@ -149,23 +117,12 @@ class StompQueue implements Queue
     }
 
     /**
-     * Get the connection name for the queue.
-     *
-     * @return string
+     * Gets queue name from an argument, or default one from config
+     * @param $queue
+     * @return mixed|string
      */
-    public function getConnectionName()
+    protected function getQueue($queue)
     {
-        // TODO: Implement getConnectionName() method.
-    }
-
-    /**
-     * Set the connection name for the queue.
-     *
-     * @param string $name
-     * @return $this
-     */
-    public function setConnectionName($name)
-    {
-        // TODO: Implement setConnectionName() method.
+        return $queue ?: $this->queue;
     }
 }
