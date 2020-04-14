@@ -30,6 +30,6 @@ class StompServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
+        $this->mergeConfigFrom(__DIR__ . '/config/stomp.php', 'queue.connections.stomp');
     }
 }
