@@ -11,6 +11,7 @@ use Stomp\Transport\Message;
 class StompJob extends Job implements JobContract
 {
     private StompQueue $stompQueue;
+
     private Message $message;
 
     /**
