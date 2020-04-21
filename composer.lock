@@ -4,29 +4,30 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6e64ebb0bdbd3dd523ca7f7bd98e3ec7",
+    "content-hash": "1426d7656dc6eb470a415a8d6647fe8a",
     "packages": [
         {
             "name": "brick/math",
-            "version": "0.8.14",
+            "version": "0.8.15",
             "source": {
                 "type": "git",
                 "url": "https://github.com/brick/math.git",
-                "reference": "6f7a46b5c3d487b277f38fbd17df57d348cace8a"
+                "reference": "9b08d412b9da9455b210459ff71414de7e6241cd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/brick/math/zipball/6f7a46b5c3d487b277f38fbd17df57d348cace8a",
-                "reference": "6f7a46b5c3d487b277f38fbd17df57d348cace8a",
+                "url": "https://api.github.com/repos/brick/math/zipball/9b08d412b9da9455b210459ff71414de7e6241cd",
+                "reference": "9b08d412b9da9455b210459ff71414de7e6241cd",
                 "shasum": ""
             },
             "require": {
-                "php": ">=7.1"
+                "ext-json": "*",
+                "php": "^7.1|^8.0"
             },
             "require-dev": {
-                "php-coveralls/php-coveralls": "2.*",
-                "phpunit/phpunit": "7.*",
-                "vimeo/psalm": "3.*"
+                "php-coveralls/php-coveralls": "^2.2",
+                "phpunit/phpunit": "^7.5.15|^8.5",
+                "vimeo/psalm": "^3.5"
             },
             "type": "library",
             "autoload": {
@@ -49,7 +50,62 @@
                 "brick",
                 "math"
             ],
-            "time": "2020-02-17T13:57:43+00:00"
+            "time": "2020-04-15T15:59:35+00:00"
+        },
+        {
+            "name": "cakephp/chronos",
+            "version": "2.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/cakephp/chronos.git",
+                "reference": "0b176c8e8abb18b552b789f60250188a74d534ab"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/cakephp/chronos/zipball/0b176c8e8abb18b552b789f60250188a74d534ab",
+                "reference": "0b176c8e8abb18b552b789f60250188a74d534ab",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.2"
+            },
+            "require-dev": {
+                "cakephp/cakephp-codesniffer": "^4.0",
+                "phpbench/phpbench": "^1.0@dev",
+                "phpunit/phpunit": "^8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Cake\\Chronos\\": "src/"
+                },
+                "files": [
+                    "src/carbon_compat.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Brian Nesbitt",
+                    "email": "brian@nesbot.com",
+                    "homepage": "http://nesbot.com"
+                },
+                {
+                    "name": "The CakePHP Team",
+                    "homepage": "http://cakephp.org"
+                }
+            ],
+            "description": "A simple API extension for DateTime.",
+            "homepage": "http://cakephp.org",
+            "keywords": [
+                "date",
+                "datetime",
+                "time"
+            ],
+            "time": "2020-02-26T20:24:12+00:00"
         },
         {
             "name": "doctrine/inflector",
@@ -120,7 +176,7 @@
         },
         {
             "name": "illuminate/console",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/console.git",
@@ -174,7 +230,7 @@
         },
         {
             "name": "illuminate/container",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/container.git",
@@ -218,16 +274,16 @@
         },
         {
             "name": "illuminate/contracts",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/contracts.git",
-                "reference": "2db7e8a936cc09e396d14902178ea177f4dc42ac"
+                "reference": "69a40779d8fc43e3f43da973b9c0c20bdbd81203"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/illuminate/contracts/zipball/2db7e8a936cc09e396d14902178ea177f4dc42ac",
-                "reference": "2db7e8a936cc09e396d14902178ea177f4dc42ac",
+                "url": "https://api.github.com/repos/illuminate/contracts/zipball/69a40779d8fc43e3f43da973b9c0c20bdbd81203",
+                "reference": "69a40779d8fc43e3f43da973b9c0c20bdbd81203",
                 "shasum": ""
             },
             "require": {
@@ -258,20 +314,20 @@
             ],
             "description": "The Illuminate Contracts package.",
             "homepage": "https://laravel.com",
-            "time": "2020-04-04T15:13:36+00:00"
+            "time": "2020-04-09T15:01:22+00:00"
         },
         {
             "name": "illuminate/database",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/database.git",
-                "reference": "0a2dce944b5a5b6f2cc376706a086a4541c528fc"
+                "reference": "2bfb896f341cb87bf417e1fb4cfdf0c2d1e36e1e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/illuminate/database/zipball/0a2dce944b5a5b6f2cc376706a086a4541c528fc",
-                "reference": "0a2dce944b5a5b6f2cc376706a086a4541c528fc",
+                "url": "https://api.github.com/repos/illuminate/database/zipball/2bfb896f341cb87bf417e1fb4cfdf0c2d1e36e1e",
+                "reference": "2bfb896f341cb87bf417e1fb4cfdf0c2d1e36e1e",
                 "shasum": ""
             },
             "require": {
@@ -320,11 +376,11 @@
                 "orm",
                 "sql"
             ],
-            "time": "2020-04-06T21:45:53+00:00"
+            "time": "2020-04-14T14:11:33+00:00"
         },
         {
             "name": "illuminate/filesystem",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/filesystem.git",
@@ -377,7 +433,7 @@
         },
         {
             "name": "illuminate/pipeline",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/pipeline.git",
@@ -421,7 +477,7 @@
         },
         {
             "name": "illuminate/queue",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/queue.git",
@@ -481,16 +537,16 @@
         },
         {
             "name": "illuminate/support",
-            "version": "v7.5.2",
+            "version": "v7.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/illuminate/support.git",
-                "reference": "b8d805437c075a44bf53737763c3b979932445c7"
+                "reference": "b6f64a42377f86b293960e0b7f6920ae59e578d2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/illuminate/support/zipball/b8d805437c075a44bf53737763c3b979932445c7",
-                "reference": "b8d805437c075a44bf53737763c3b979932445c7",
+                "url": "https://api.github.com/repos/illuminate/support/zipball/b6f64a42377f86b293960e0b7f6920ae59e578d2",
+                "reference": "b6f64a42377f86b293960e0b7f6920ae59e578d2",
                 "shasum": ""
             },
             "require": {
@@ -539,7 +595,80 @@
             ],
             "description": "The Illuminate Support package.",
             "homepage": "https://laravel.com",
-            "time": "2020-04-08T13:18:06+00:00"
+            "time": "2020-04-15T19:48:40+00:00"
+        },
+        {
+            "name": "laravel/horizon",
+            "version": "v4.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/horizon.git",
+                "reference": "fda753c79ddef7ee4f16fb34cd3fc3fd64d4f114"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/horizon/zipball/fda753c79ddef7ee4f16fb34cd3fc3fd64d4f114",
+                "reference": "fda753c79ddef7ee4f16fb34cd3fc3fd64d4f114",
+                "shasum": ""
+            },
+            "require": {
+                "cakephp/chronos": "^2.0",
+                "ext-json": "*",
+                "ext-pcntl": "*",
+                "ext-posix": "*",
+                "illuminate/contracts": "^7.0",
+                "illuminate/queue": "^7.0",
+                "illuminate/support": "^7.0",
+                "php": "^7.2",
+                "ramsey/uuid": "^3.5|^4.0",
+                "symfony/error-handler": "^5.0",
+                "symfony/process": "^5.0"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.0",
+                "orchestra/testbench": "^5.0",
+                "phpunit/phpunit": "^8.0",
+                "predis/predis": "^1.1"
+            },
+            "suggest": {
+                "ext-redis": "Required to use the Redis PHP driver.",
+                "predis/predis": "Required when not using the Redis PHP driver (^1.1)."
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "4.x-dev"
+                },
+                "laravel": {
+                    "providers": [
+                        "Laravel\\Horizon\\HorizonServiceProvider"
+                    ],
+                    "aliases": {
+                        "Horizon": "Laravel\\Horizon\\Horizon"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Horizon\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Taylor Otwell",
+                    "email": "taylor@laravel.com"
+                }
+            ],
+            "description": "Dashboard and code-driven configuration for Laravel queues.",
+            "keywords": [
+                "laravel",
+                "queue"
+            ],
+            "time": "2020-04-14T15:42:35+00:00"
         },
         {
             "name": "nesbot/carbon",
@@ -721,6 +850,53 @@
                 "psr"
             ],
             "time": "2017-02-14T16:28:37+00:00"
+        },
+        {
+            "name": "psr/log",
+            "version": "1.1.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-fig/log.git",
+                "reference": "0f73288fd15629204f9d42b7055f72dacbe811fc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-fig/log/zipball/0f73288fd15629204f9d42b7055f72dacbe811fc",
+                "reference": "0f73288fd15629204f9d42b7055f72dacbe811fc",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Psr\\Log\\": "Psr/Log/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "PHP-FIG",
+                    "homepage": "http://www.php-fig.org/"
+                }
+            ],
+            "description": "Common interface for logging libraries",
+            "homepage": "https://github.com/php-fig/log",
+            "keywords": [
+                "log",
+                "psr",
+                "psr-3"
+            ],
+            "time": "2020-03-23T09:12:05+00:00"
         },
         {
             "name": "psr/simple-cache",
@@ -1046,6 +1222,61 @@
             "description": "Symfony Console Component",
             "homepage": "https://symfony.com",
             "time": "2020-03-30T11:42:42+00:00"
+        },
+        {
+            "name": "symfony/error-handler",
+            "version": "v5.0.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/error-handler.git",
+                "reference": "949ffc17c3ac3a9f8e6232220e2da33913c04ea4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/error-handler/zipball/949ffc17c3ac3a9f8e6232220e2da33913c04ea4",
+                "reference": "949ffc17c3ac3a9f8e6232220e2da33913c04ea4",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.2.5",
+                "psr/log": "^1.0",
+                "symfony/var-dumper": "^4.4|^5.0"
+            },
+            "require-dev": {
+                "symfony/http-kernel": "^4.4|^5.0",
+                "symfony/serializer": "^4.4|^5.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "5.0-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\ErrorHandler\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Symfony ErrorHandler Component",
+            "homepage": "https://symfony.com",
+            "time": "2020-03-30T14:14:32+00:00"
         },
         {
             "name": "symfony/finder",
@@ -1511,6 +1742,81 @@
                 "standards"
             ],
             "time": "2019-11-18T17:27:11+00:00"
+        },
+        {
+            "name": "symfony/var-dumper",
+            "version": "v5.0.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/var-dumper.git",
+                "reference": "f74a126acd701392eef2492a17228d42552c86b5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/var-dumper/zipball/f74a126acd701392eef2492a17228d42552c86b5",
+                "reference": "f74a126acd701392eef2492a17228d42552c86b5",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.2.5",
+                "symfony/polyfill-mbstring": "~1.0"
+            },
+            "conflict": {
+                "phpunit/phpunit": "<5.4.3",
+                "symfony/console": "<4.4"
+            },
+            "require-dev": {
+                "ext-iconv": "*",
+                "symfony/console": "^4.4|^5.0",
+                "symfony/process": "^4.4|^5.0",
+                "twig/twig": "^2.4|^3.0"
+            },
+            "suggest": {
+                "ext-iconv": "To convert non-UTF-8 strings to UTF-8 (or symfony/polyfill-iconv in case ext-iconv cannot be used).",
+                "ext-intl": "To show region name in time zone dump",
+                "symfony/console": "To use the ServerDumpCommand and/or the bin/var-dump-server script"
+            },
+            "bin": [
+                "Resources/bin/var-dump-server"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "5.0-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "Resources/functions/dump.php"
+                ],
+                "psr-4": {
+                    "Symfony\\Component\\VarDumper\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Nicolas Grekas",
+                    "email": "p@tchwork.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Symfony mechanism for exploring and dumping PHP variables",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "debug",
+                "dump"
+            ],
+            "time": "2020-03-27T16:56:45+00:00"
         },
         {
             "name": "voku/portable-ascii",
@@ -3088,16 +3394,16 @@
         },
         {
             "name": "webmozart/assert",
-            "version": "1.7.0",
+            "version": "1.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/webmozart/assert.git",
-                "reference": "aed98a490f9a8f78468232db345ab9cf606cf598"
+                "reference": "ab2cb0b3b559010b75981b1bdce728da3ee90ad6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/webmozart/assert/zipball/aed98a490f9a8f78468232db345ab9cf606cf598",
-                "reference": "aed98a490f9a8f78468232db345ab9cf606cf598",
+                "url": "https://api.github.com/repos/webmozart/assert/zipball/ab2cb0b3b559010b75981b1bdce728da3ee90ad6",
+                "reference": "ab2cb0b3b559010b75981b1bdce728da3ee90ad6",
                 "shasum": ""
             },
             "require": {
@@ -3105,7 +3411,7 @@
                 "symfony/polyfill-ctype": "^1.8"
             },
             "conflict": {
-                "vimeo/psalm": "<3.6.0"
+                "vimeo/psalm": "<3.9.1"
             },
             "require-dev": {
                 "phpunit/phpunit": "^4.8.36 || ^7.5.13"
@@ -3132,7 +3438,7 @@
                 "check",
                 "validate"
             ],
-            "time": "2020-02-14T12:15:55+00:00"
+            "time": "2020-04-18T12:12:48+00:00"
         }
     ],
     "aliases": [],

@@ -9,4 +9,9 @@ return [
     'username' => env('STOMP_USERNAME', 'admin'),
     'password' => env('STOMP_PASSWORD', 'admin'),
     'vhost'    => env('STOMP_VHOST', '/'),
+
+    /*
+     * Set to "horizon" if you wish to use Laravel Horizon.
+     */
+    'worker' => env('STOMP_WORKER', 'default'),
 ];

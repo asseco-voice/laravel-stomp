@@ -2,11 +2,28 @@
 
 namespace Norgul\Stomp\Queue\Connectors;
 
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\WorkerStopping;
+use Illuminate\Support\Facades\Config;
+use Norgul\Stomp\Horizon\Listeners\StompFailedEvent;
+use Norgul\Stomp\Horizon\StompQueue as HorizonStompQueue;
 use Norgul\Stomp\Queue\StompQueue;
+use Stomp\Network\Connection;
 
 class StompConnector implements ConnectorInterface
 {
+    /**
+     * @var Dispatcher
+     */
+    private Dispatcher $dispatcher;
+
+    public function __construct(Dispatcher $dispatcher)
+    {
+        $this->dispatcher = $dispatcher;
+    }
+
     /**
      * Establish a queue connection.
      *
@@ -16,6 +33,36 @@ class StompConnector implements ConnectorInterface
      */
     public function connect(array $config)
     {
-        return new StompQueue();
+        $queue = $this->selectWorker();
+
+        if ($queue instanceof HorizonStompQueue) {
+            $this->dispatcher->listen(JobFailed::class, StompFailedEvent::class);
+        }
+
+        $this->dispatcher->listen(WorkerStopping::class, static function () use ($queue): void {
+            $queue->close();
+        });
+
+        return $queue;
+    }
+
+    /**
+     * Select worker depending on config.
+     * @param string $worker
+     * @param Connection $connection
+     * @param string $queue
+     * @param array $options
+     * @return HorizonStompQueue|StompQueue
+     * @throws \Stomp\Exception\ConnectionException
+     */
+    public function selectWorker()
+    {
+        $worker = Config::get('queue.connections.stomp.worker');
+        switch ($worker) {
+            case 'horizon':
+                return new HorizonStompQueue();
+            default:
+                return new StompQueue();
+        }
     }
 }

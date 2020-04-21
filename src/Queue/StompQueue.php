@@ -5,6 +5,8 @@ namespace Norgul\Stomp\Queue;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Str;
+use Norgul\Stomp\Queue\Jobs\StompJob;
 use Stomp\Client;
 use Stomp\Exception\ConnectionException;
 use Stomp\Network\Connection;
@@ -13,12 +15,6 @@ use Stomp\Transport\Message;
 
 class StompQueue extends Queue implements QueueInterface
 {
-    public string $protocol;
-    public string $host;
-    public string $port;
-    public string $username;
-    public string $password;
-
     /**
      * Queue name
      */
@@ -27,29 +23,58 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Stomp instance from stomp-php repo
      */
-    public StatefulStomp $stompPHP;
+    public StatefulStomp $stompClient;
+
+    /**
+     * Current job being processed.
+     *
+     * @var StompJob
+     */
+    protected StompJob $currentJob;
+
+    protected Connection $connection;
 
     /**
      * StompQueue constructor.
+     * @param StatefulStomp $stompClient
+     * @param $queue
+     * @param $options
      * @throws ConnectionException
      */
     public function __construct()
     {
-        $this->protocol = Config::get('queue.connections.stomp.protocol');
-        $this->host = Config::get('queue.connections.stomp.host');
-        $this->port = Config::get('queue.connections.stomp.port');
-        $this->username = Config::get('queue.connections.stomp.username');
-        $this->password = Config::get('queue.connections.stomp.password');
         $this->queue = Config::get('queue.connections.stomp.queue');
+        $this->connection = $this->initConnection();
+        $client = new Client($this->connection);
 
-        $connection = new Connection("$this->protocol://$this->host");
-        $client = new Client($connection);
+        $this->setCredentials($client);
+        $this->stompClient = new StatefulStomp($client);
+    }
 
-        if ($this->username && $this->password) {
-            $client->setLogin($this->username, $this->password);
+    /**
+     * @return Connection
+     * @throws \Stomp\Exception\ConnectionException
+     */
+    protected function initConnection(): Connection
+    {
+        $protocol = Config::get('queue.connections.stomp.protocol');
+        $host = Config::get('queue.connections.stomp.host');
+        $port = Config::get('queue.connections.stomp.port');
+
+        return new Connection("$protocol://$host:$port");
+    }
+
+    /**
+     * @param Client $client
+     */
+    protected function setCredentials(Client $client): void
+    {
+        $username = Config::get('queue.connections.stomp.username');
+        $password = Config::get('queue.connections.stomp.password');
+
+        if ($username && $password) {
+            $client->setLogin($username, $password);
         }
-
-        $this->stompPHP = new StatefulStomp($client);
     }
 
     /**
@@ -74,7 +99,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function push($job, $data = '', $queue = null)
     {
-        return $this->pushRaw($this->createPayload($job, $data), $queue);
+        return $this->pushRaw($this->createPayload($job, $queue, $data), $queue, []);
     }
 
     /**
@@ -87,9 +112,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pushRaw($payload, $queue = null, array $options = [])
     {
-        // TODO: check...options are headers. Is this correct?
         $message = new Message($payload, $options);
-        return $this->stompPHP->send($this->getQueue($queue), $message);
+        return $this->stompClient->send($this->getQueue($queue), $message);
     }
 
     /**
@@ -103,8 +127,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
-        $payload = $this->createPayload($job, $data, $queue);
-        return $this->pushRaw($payload, $queue); //, $this->makeDelayHeader($delay));
+        return $this->pushRaw($this->createPayload($job, $data, $queue), $queue);
     }
 
     /**
@@ -115,16 +138,68 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
-        // TODO: Implement pop() method.
+        $queue = $this->getQueue($queue);
+
+        /** @var Message|null $message */
+        /*if (!($message = $this->channel->basic_get($queue))) {
+            return null;
+        }*/
+
+        return $this->currentJob = new StompJob(
+            $this->container,
+            $this,
+            $message,
+            $this->connectionName,
+            $queue
+        );
+    }
+
+
+    /**
+     * Create a payload array from the given job and data.
+     *
+     * @param object|string $job
+     * @param string $queue
+     * @param string $data
+     * @return array
+     */
+    protected function createPayloadArray($job, $queue, $data = '')
+    {
+        return array_merge(parent::createPayloadArray($job, $queue, $data), [
+            'id' => $this->getRandomId(),
+        ]);
     }
 
     /**
-     * Gets queue name from an argument, or default one from config
-     * @param $queue
-     * @return mixed|string
+     * Close the connection.
+     *
+     * @return void
      */
-    protected function getQueue($queue)
+    public function close(): void
+    {
+        if ($this->currentJob && !$this->currentJob->isDeletedOrReleased()) {
+            $this->connection->disconnect();
+        }
+    }
+
+    /**
+     * Get the queue or return the default.
+     *
+     * @param string|null $queue
+     * @return string
+     */
+    public function getQueue($queue)
     {
         return $queue ?: $this->queue;
+    }
+
+    /**
+     * Get a random ID string.
+     *
+     * @return string
+     */
+    protected function getRandomId(): string
+    {
+        return Str::random(32);
     }
 }
