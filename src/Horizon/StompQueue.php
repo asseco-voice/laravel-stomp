@@ -3,6 +3,7 @@
 namespace Norgul\Stomp\Horizon;
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobDeleted;
 use Laravel\Horizon\Events\JobPushed;
 use Laravel\Horizon\Events\JobReserved;
@@ -28,7 +29,9 @@ class StompQueue extends BaseStompQueue
      */
     public function readyNow($queue = null)
     {
-        return $this->size($queue);
+        $size = $this->size($queue);
+        Log::info('[STOMP] Queue size: ' . $size);
+        return $size;
     }
 
     /**
@@ -42,7 +45,6 @@ class StompQueue extends BaseStompQueue
     public function push($job, $data = '', $queue = null)
     {
         $this->lastPushed = $job;
-
         return parent::push($job, $data, $queue);
     }
 
@@ -89,6 +91,8 @@ class StompQueue extends BaseStompQueue
      */
     public function pop($queue = null)
     {
+        Log::info('[STOMP] Popping a job from queue...');
+
         return tap(parent::pop($queue), function ($result) use ($queue) {
             if ($result instanceof StompJob) {
                 $this->event($this->getQueue($queue), new JobReserved($result->getRawBody()));
@@ -97,24 +101,16 @@ class StompQueue extends BaseStompQueue
     }
 
     /**
-     * {@inheritdoc}
-     */
-    public function release($delay, $job, $data, $queue, $attempts = 0)
-    {
-        $this->lastPushed = $job;
-
-        return parent::release($delay, $job, $data, $queue, $attempts);
-    }
-
-    /**
      * Delete a reserved job from the queue.
      *
      * @param string $queue
      * @param StompJob $job
      * @return void
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function deleteReserved($queue, $job)
     {
+        Log::info('[STOMP] Deleting a reserved job: ' . print_r(['job' => $job, 'queue' => $queue], true));
         $this->event($this->getQueue($queue), new JobDeleted($job, $job->getRawBody()));
     }
 
@@ -128,9 +124,13 @@ class StompQueue extends BaseStompQueue
      */
     protected function event($queue, $event)
     {
+        Log::info('[STOMP] Firing event: ' . print_r(['event' => $event, 'queue' => $queue], true));
+
         if ($this->container && $this->container->bound(Dispatcher::class)) {
+            $connectionName = $this->getConnectionName();
+            Log::info('[STOMP] Dispatching event: ' . print_r(['connectionName' => $connectionName, 'queue' => $queue], true));
             $this->container->make(Dispatcher::class)->dispatch(
-                $event->connection($this->getConnectionName())->queue($queue)
+                $event->connection($connectionName)->queue($queue)
             );
         }
     }

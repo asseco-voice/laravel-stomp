@@ -5,30 +5,29 @@ namespace Norgul\Stomp\Queue\Jobs;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Norgul\Stomp\Queue\StompQueue;
-use Stomp\Transport\Message;
+use Stomp\Transport\Frame;
 
 class StompJob extends Job implements JobContract
 {
+    /**
+     * The Stomp instance.
+     */
     private StompQueue $stompQueue;
 
-    private Message $message;
-
     /**
-     * The JSON decoded version of "$message".
-     *
-     * @var array
+     * The Stomp frame instance.
+     * Message is just Frame with SEND command
      */
-    protected $decoded;
+    protected Frame $frame;
 
-    public function __construct(Container $container, StompQueue $stompQueue, Message $message, string $connectionName, string $queue)
+    public function __construct(Container $container, StompQueue $stompQueue, Frame $frame)
     {
         $this->container = $container;
         $this->stompQueue = $stompQueue;
-        $this->message = $message;
-        $this->connectionName = $connectionName;
-        $this->queue = $queue;
-        $this->decoded = $this->payload();
+        $this->frame = $frame;
     }
 
     /**
@@ -38,17 +37,18 @@ class StompJob extends Job implements JobContract
      */
     public function getJobId()
     {
-        return $this->decoded['id'] ?? null;
+        return Arr::get($this->payload(), 'id', null);
     }
 
     /**
-     * Get the raw body of the job.
+     * Get the raw body string for the job.
      *
      * @return string
      */
     public function getRawBody()
     {
-        return $this->message->getBody();
+        Log::info("[STOMP] Raw frame body: {$this->frame->body}");
+        return $this->frame->body;
     }
 
     /**
@@ -58,15 +58,67 @@ class StompJob extends Job implements JobContract
      */
     public function attempts()
     {
-        $headers = $this->message->getHeaders();
+        $attempts = Arr::get($this->payload(), 'attempts', 1);
+        Log::info("[STOMP] Attempts: {$attempts}");
+        return $attempts;
+    }
 
-        if (!$headers['application_headers']) {
-            return null;
-        }
+    /**
+     * Delete the job from the queue.
+     *
+     * @return void
+     */
+    public function delete()
+    {
+        Log::info("[STOMP] Deleting job from queue: {$this->frame}");
+        parent::delete();
+        $this->stompQueue->deleteMessage($this->getQueue(), $this->frame);
+    }
 
-        // TODO: check this out
-        //$attempts = (int) Arr::get($data, 'laravel.attempts', 0);
+    /**
+     * Release the job back into the queue.
+     *
+     * @param int $delay
+     * @return void
+     */
+    public function release($delay = 0)
+    {
+        parent::release($delay);
+        $this->recreateJob($delay);
+    }
 
-        return 1;
+    /**
+     * Release a pushed job back onto the queue.
+     *
+     * @param int $delay
+     * @return void
+     */
+    protected function recreateJob($delay)
+    {
+        $payload = $this->payload();
+        Arr::set($payload, 'attempts', Arr::get($payload, 'attempts', 1) + 1);
+
+        $this->stompQueue->recreate(json_encode($payload), $this->getQueue(), $delay);
+    }
+
+
+    /**
+     * Get the name of the queued job class.
+     *
+     * @return string
+     */
+    public function getName()
+    {
+        return Arr::get($this->payload(), 'job');
+    }
+
+    /**
+     * Get the name of the queue the job belongs to.
+     *
+     * @return string
+     */
+    public function getQueue()
+    {
+        return Arr::get($this->payload(), 'queue');
     }
 }

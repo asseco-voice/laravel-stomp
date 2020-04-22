@@ -5,12 +5,14 @@ namespace Norgul\Stomp\Queue;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Norgul\Stomp\Queue\Jobs\StompJob;
 use Stomp\Client;
 use Stomp\Exception\ConnectionException;
 use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
+use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
 
 class StompQueue extends Queue implements QueueInterface
@@ -46,9 +48,10 @@ class StompQueue extends Queue implements QueueInterface
         $this->queue = Config::get('queue.connections.stomp.queue');
         $this->connection = $this->initConnection();
         $client = new Client($this->connection);
-
         $this->setCredentials($client);
+        $client->setSync(false); // U config?
         $this->stompClient = new StatefulStomp($client);
+        Log::info('[STOMP] Queue initialized successfully.');
     }
 
     /**
@@ -113,7 +116,24 @@ class StompQueue extends Queue implements QueueInterface
     public function pushRaw($payload, $queue = null, array $options = [])
     {
         $message = new Message($payload, $options);
-        return $this->stompClient->send($this->getQueue($queue), $message);
+        $queue = $this->getQueue($queue);
+
+        Log::info('[STOMP] Pushing a payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
+
+        return $this->stompClient->send($queue, $message);
+    }
+
+    /**
+     * Push a raw payload onto the queue after encrypting the payload.
+     *
+     * @param  string  $payload
+     * @param  string  $queue
+     * @param  int     $delay
+     * @return mixed
+     */
+    public function recreate($payload, $queue, $delay)
+    {
+        return $this->pushRaw($payload, $queue, $delay);
     }
 
     /**
@@ -138,20 +158,14 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
-        $queue = $this->getQueue($queue);
+        $this->stompClient->subscribe($this->getQueue($queue));
+        $job = $this->stompClient->read();
 
-        /** @var Message|null $message */
-        /*if (!($message = $this->channel->basic_get($queue))) {
-            return null;
-        }*/
+        if (!is_null($job) && ($job instanceof Frame)) {
+            return new StompJob($this->container, $this, $job);
+        }
 
-        return $this->currentJob = new StompJob(
-            $this->container,
-            $this,
-            $message,
-            $this->connectionName,
-            $queue
-        );
+        return null;
     }
 
 
@@ -202,4 +216,17 @@ class StompQueue extends Queue implements QueueInterface
     {
         return Str::random(32);
     }
+
+    /**
+     * Delete a message from the Stomp queue.
+     *
+     * @param string $queue
+     * @param string|Frame $message
+     * @return void
+     */
+    public function deleteMessage($queue, Frame $message)
+    {
+        $this->stompClient->ack($message);
+    }
+
 }
