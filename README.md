@@ -31,6 +31,7 @@ STOMP_PORT          port where STOMP is exposed in your broker
 STOMP_USERNAME      broker username
 STOMP_PASSWORD      broker password
 STOMP_VHOST         broker vhost
+STOMP_WORKER        job worker to be used
 ```
 
 If you take a look at libraries inner config you will see that
@@ -52,6 +53,11 @@ following under connections key:
     'username' => env('STOMP_USERNAME', 'admin'),
     'password' => env('STOMP_PASSWORD', 'admin'),
     'vhost'    => env('STOMP_VHOST', '/'),
+
+    /*
+     * Job worker - 'default' or 'horizon'
+     */
+    'worker' => env('STOMP_WORKER', 'default'),
 ],
 ```
 

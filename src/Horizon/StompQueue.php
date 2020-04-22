@@ -112,7 +112,6 @@ class StompQueue extends BaseStompQueue
      * @param string $queue
      * @param StompJob $job
      * @return void
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function deleteReserved($queue, $job)
     {
