@@ -91,8 +91,6 @@ class StompQueue extends BaseStompQueue
      */
     public function pop($queue = null)
     {
-        Log::info('[STOMP] Popping a job from queue...');
-
         return tap(parent::pop($queue), function ($result) use ($queue) {
             if ($result instanceof StompJob) {
                 $this->event($this->getQueue($queue), new JobReserved($result->getRawBody()));
@@ -124,13 +122,17 @@ class StompQueue extends BaseStompQueue
      */
     protected function event($queue, $event)
     {
-        Log::info('[STOMP] Firing event: ' . print_r(['event' => $event, 'queue' => $queue], true));
+        Log::info('[STOMP] Firing event...');
 
         if ($this->container && $this->container->bound(Dispatcher::class)) {
-            $connectionName = $this->getConnectionName();
-            Log::info('[STOMP] Dispatching event: ' . print_r(['connectionName' => $connectionName, 'queue' => $queue], true));
+            /**
+             * @var JobPushed $connection
+             */
+            $connection = $event->connection($this->getConnectionName());
+            Log::info('[STOMP] Dispatching: ' . print_r($connection, true));
+
             $this->container->make(Dispatcher::class)->dispatch(
-                $event->connection($connectionName)->queue($queue)
+                $connection->queue($queue)
             );
         }
     }

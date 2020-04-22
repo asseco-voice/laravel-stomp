@@ -49,7 +49,7 @@ class StompQueue extends Queue implements QueueInterface
         $this->connection = $this->initConnection();
         $client = new Client($this->connection);
         $this->setCredentials($client);
-        $client->setSync(false); // U config?
+        $client->setSync(false); // TODO: baci u config?
         $this->stompClient = new StatefulStomp($client);
         Log::info('[STOMP] Queue initialized successfully.');
     }
@@ -161,11 +161,13 @@ class StompQueue extends Queue implements QueueInterface
         $this->stompClient->subscribe($this->getQueue($queue));
         $job = $this->stompClient->read();
 
-        if (!is_null($job) && ($job instanceof Frame)) {
-            return new StompJob($this->container, $this, $job);
+        if (is_null($job) || !($job instanceof Frame)) {
+            return null;
         }
 
-        return null;
+        Log::info('[STOMP] Popping a job from queue: ' . print_r($job, true));
+
+        return new StompJob($this->container, $this, $job);
     }
 
 
@@ -179,8 +181,11 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function createPayloadArray($job, $queue, $data = '')
     {
+        $randomId = $this->getRandomId();
+        Log::info("[STOMP] Random ID: {$randomId}");
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id' => $this->getRandomId(),
+            'id' => $randomId,
+            'message-id' => $randomId,
         ]);
     }
 
