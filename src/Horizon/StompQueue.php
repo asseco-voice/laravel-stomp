@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobDeleted;
 use Laravel\Horizon\Events\JobPushed;
 use Laravel\Horizon\Events\JobReserved;
-use Laravel\Horizon\JobId;
 use Laravel\Horizon\JobPayload;
 use Norgul\Stomp\Queue\Jobs\StompJob;
 use Norgul\Stomp\Queue\StompQueue as BaseStompQueue;
