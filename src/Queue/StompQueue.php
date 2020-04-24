@@ -4,7 +4,6 @@ namespace Norgul\Stomp\Queue;
 
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Norgul\Stomp\Queue\Jobs\StompJob;
@@ -45,11 +44,11 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function __construct()
     {
-        $this->queue = Config::get('queue.connections.stomp.queue');
+        $this->queue = StompConfig::get('queue');
         $this->connection = $this->initConnection();
         $client = new Client($this->connection);
         $this->setCredentials($client);
-        $client->setSync(false); // TODO: baci u config?
+        $client->setSync(false);
         $this->stompClient = new StatefulStomp($client);
         Log::info('[STOMP] Queue initialized successfully.');
     }
@@ -60,9 +59,9 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function initConnection(): Connection
     {
-        $protocol = Config::get('queue.connections.stomp.protocol');
-        $host = Config::get('queue.connections.stomp.host');
-        $port = Config::get('queue.connections.stomp.port');
+        $protocol = StompConfig::get('protocol');
+        $host = StompConfig::get('host');
+        $port = StompConfig::get('port');
 
         return new Connection("$protocol://$host:$port");
     }
@@ -72,8 +71,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function setCredentials(Client $client): void
     {
-        $username = Config::get('queue.connections.stomp.username');
-        $password = Config::get('queue.connections.stomp.password');
+        $username = StompConfig::get('username');
+        $password = StompConfig::get('password');
 
         if ($username && $password) {
             $client->setLogin($username, $password);
@@ -118,7 +117,7 @@ class StompQueue extends Queue implements QueueInterface
         $message = new Message($payload, $options);
         $queue = $this->getQueue($queue);
 
-        Log::info('[STOMP] Pushing a payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
+        Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
         return $this->stompClient->send($queue, $message);
     }
@@ -126,9 +125,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue after encrypting the payload.
      *
-     * @param  string  $payload
-     * @param  string  $queue
-     * @param  int     $delay
+     * @param string $payload
+     * @param string $queue
+     * @param int $delay
      * @return mixed
      */
     public function recreate($payload, $queue, $delay)
@@ -158,8 +157,13 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
-        $this->stompClient->subscribe($this->getQueue($queue));
-        $job = $this->stompClient->read();
+        try {
+            $this->stompClient->subscribe($this->getQueue($queue));
+            $job = $this->stompClient->read();
+        } catch (\Exception $e) {
+            Log::info('[STOMP] Stomp failed to subscribe.');
+            return null;
+        }
 
         if (is_null($job) || !($job instanceof Frame)) {
             return null;
@@ -184,8 +188,8 @@ class StompQueue extends Queue implements QueueInterface
         $randomId = $this->getRandomId();
         Log::info("[STOMP] Random ID: {$randomId}");
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id' => $randomId,
-            'message-id' => $randomId,
+            'id'  => $randomId,
+            'raw' => $job,
         ]);
     }
 
@@ -231,6 +235,11 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function deleteMessage($queue, Frame $message)
     {
+        Log::info('[STOMP] Deleting a message from queue: ' . print_r([
+                'queue'   => $queue,
+                'message' => $message,
+            ], true));
+
         $this->stompClient->ack($message);
     }
 

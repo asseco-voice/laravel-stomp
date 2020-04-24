@@ -127,21 +127,15 @@ class StompQueue extends BaseStompQueue
         if ($this->container && $this->container->bound(Dispatcher::class)) {
             /**
              * @var JobPushed $connection
+             * @var JobReserved $event
              */
             $connection = $event->connection($this->getConnectionName());
+
             Log::info('[STOMP] Dispatching: ' . print_r($connection, true));
 
             $this->container->make(Dispatcher::class)->dispatch(
                 $connection->queue($queue)
             );
         }
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function getRandomId(): string
-    {
-        return JobId::generate();
     }
 }

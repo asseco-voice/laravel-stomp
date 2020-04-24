@@ -42,7 +42,7 @@ class StompJob extends Job implements JobContract
      */
     public function getJobId()
     {
-        $jobId = Arr::get($this->payload(), 'message-id', null);
+        $jobId = Arr::get($this->payload(), 'id', null);
         Log::info("[STOMP] Job ID: {$jobId}");
         return $jobId;
     }
@@ -77,7 +77,6 @@ class StompJob extends Job implements JobContract
      */
     public function delete()
     {
-        Log::info("[STOMP] Deleting a job from queue. Frame: " . print_r($this->frame, true));
         parent::delete();
         $this->stompQueue->deleteMessage($this->getQueue(), $this->frame);
     }
