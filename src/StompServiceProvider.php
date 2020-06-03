@@ -1,10 +1,10 @@
 <?php
 
-namespace Norgul\Stomp;
+namespace Voice\Stomp;
 
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
-use Norgul\Stomp\Queue\Connectors\StompConnector;
+use Voice\Stomp\Queue\Connectors\StompConnector;
 
 class StompServiceProvider extends ServiceProvider
 {
