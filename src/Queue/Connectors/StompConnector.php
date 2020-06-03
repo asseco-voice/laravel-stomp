@@ -1,15 +1,15 @@
 <?php
 
-namespace Norgul\Stomp\Queue\Connectors;
+namespace Voice\Stomp\Queue\Connectors;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Config;
-use Norgul\Stomp\Horizon\Listeners\StompFailedEvent;
-use Norgul\Stomp\Horizon\StompQueue as HorizonStompQueue;
-use Norgul\Stomp\Queue\StompQueue;
+use Voice\Stomp\Horizon\Listeners\StompFailedEvent;
+use Voice\Stomp\Horizon\StompQueue as HorizonStompQueue;
+use Voice\Stomp\Queue\StompQueue;
 use Stomp\Network\Connection;
 
 class StompConnector implements ConnectorInterface

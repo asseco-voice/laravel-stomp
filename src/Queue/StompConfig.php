@@ -1,6 +1,6 @@
 <?php
 
-namespace Norgul\Stomp\Queue;
+namespace Voice\Stomp\Queue;
 
 use Illuminate\Support\Facades\Config;
 

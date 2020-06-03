@@ -1,13 +1,13 @@
 <?php
 
-namespace Norgul\Stomp\Queue\Jobs;
+namespace Voice\Stomp\Queue\Jobs;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Norgul\Stomp\Queue\StompQueue;
+use Voice\Stomp\Queue\StompQueue;
 use Stomp\Transport\Frame;
 
 class StompJob extends Job implements JobContract

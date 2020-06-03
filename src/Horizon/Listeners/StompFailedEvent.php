@@ -1,12 +1,12 @@
 <?php
 
-namespace Norgul\Stomp\Horizon\Listeners;
+namespace Voice\Stomp\Horizon\Listeners;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Events\JobFailed as LaravelJobFailed;
 use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobFailed;
-use Norgul\Stomp\Queue\Jobs\StompJob;
+use Voice\Stomp\Queue\Jobs\StompJob;
 
 class StompFailedEvent
 {

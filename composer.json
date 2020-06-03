@@ -1,5 +1,5 @@
 {
-    "name": "norgul/laravel-stomp",
+    "name": "asseco-voice/laravel-stomp",
     "description": "Laravel Stomp driver",
     "keywords": [
         "php",
@@ -9,12 +9,6 @@
         "queue"
     ],
     "license": "MIT",
-    "authors": [
-        {
-            "name": "Marko Dupor",
-            "email": "marko.dupor@gmail.com"
-        }
-    ],
     "require": {
         "php": "^7.4",
         "illuminate/support": "^7.5",
@@ -29,13 +23,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Norgul\\Stomp\\": "src/"
+            "Voice\\Stomp\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Norgul\\Stomp\\StompServiceProvider"
+                "Voice\\Stomp\\StompServiceProvider"
             ]
         }
     }

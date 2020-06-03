@@ -1,12 +1,12 @@
 <?php
 
-namespace Norgul\Stomp\Queue;
+namespace Voice\Stomp\Queue;
 
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Norgul\Stomp\Queue\Jobs\StompJob;
+use Voice\Stomp\Queue\Jobs\StompJob;
 use Stomp\Client;
 use Stomp\Exception\ConnectionException;
 use Stomp\Network\Connection;

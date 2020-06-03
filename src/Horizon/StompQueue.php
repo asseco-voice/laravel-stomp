@@ -1,6 +1,6 @@
 <?php
 
-namespace Norgul\Stomp\Horizon;
+namespace Voice\Stomp\Horizon;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Log;
@@ -8,8 +8,8 @@ use Laravel\Horizon\Events\JobDeleted;
 use Laravel\Horizon\Events\JobPushed;
 use Laravel\Horizon\Events\JobReserved;
 use Laravel\Horizon\JobPayload;
-use Norgul\Stomp\Queue\Jobs\StompJob;
-use Norgul\Stomp\Queue\StompQueue as BaseStompQueue;
+use Voice\Stomp\Queue\Jobs\StompJob;
+use Voice\Stomp\Queue\StompQueue as BaseStompQueue;
 
 class StompQueue extends BaseStompQueue
 {
