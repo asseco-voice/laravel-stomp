@@ -12,7 +12,7 @@ Laravel 7.4.
 Package is installed through composer and is automatically registered
 as a Laravel service provider.
 
-``composer require norgul/laravel-stomp``
+``composer require asseco-voice/laravel-stomp``
 
 In order to connect it to your queue you need to change queue
 connection driver in ``.env`` file:
