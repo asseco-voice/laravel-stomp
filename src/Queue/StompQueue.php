@@ -6,13 +6,14 @@ use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Voice\Stomp\Queue\Jobs\StompJob;
 use Stomp\Client;
 use Stomp\Exception\ConnectionException;
+use Stomp\Exception\StompException;
 use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
+use Voice\Stomp\Queue\Jobs\StompJob;
 
 class StompQueue extends Queue implements QueueInterface
 {
@@ -49,8 +50,14 @@ class StompQueue extends Queue implements QueueInterface
         $client = new Client($this->connection);
         $this->setCredentials($client);
         $client->setSync(false);
-        $this->stompClient = new StatefulStomp($client);
-        Log::info('[STOMP] Queue initialized successfully.');
+
+        try {
+            $client->connect();
+            $this->stompClient = new StatefulStomp($client);
+            Log::info('[STOMP] Queue initialized successfully.');
+        } catch (StompException $e) {
+            Log::error('[STOMP] Connection failed: ' . print_r($e->getMessage(), true));
+        }
     }
 
     /**
@@ -88,7 +95,7 @@ class StompQueue extends Queue implements QueueInterface
     public function size($queue = null)
     {
         // TODO: Implement size() method.
-        return 1;
+        return 0;
     }
 
     /**
@@ -161,7 +168,7 @@ class StompQueue extends Queue implements QueueInterface
             $this->stompClient->subscribe($this->getQueue($queue));
             $job = $this->stompClient->read();
         } catch (\Exception $e) {
-            Log::info('[STOMP] Stomp failed to subscribe.');
+            Log::error('[STOMP] Stomp failed to subscribe.');
             return null;
         }
 
@@ -185,10 +192,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function createPayloadArray($job, $queue, $data = '')
     {
-        $randomId = $this->getRandomId();
-        Log::info("[STOMP] Random ID: {$randomId}");
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id'  => $randomId,
+            'id'  => $this->getRandomId(),
             'raw' => $job,
         ]);
     }
@@ -240,7 +245,7 @@ class StompQueue extends Queue implements QueueInterface
                 'message' => $message,
             ], true));
 
-        $this->stompClient->ack($message);
+        // $this->stompClient->ack($message); // subscribe je zapravo ack...recimo...
     }
 
 }

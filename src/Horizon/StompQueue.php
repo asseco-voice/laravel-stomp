@@ -28,9 +28,7 @@ class StompQueue extends BaseStompQueue
      */
     public function readyNow($queue = null)
     {
-        $size = $this->size($queue);
-        Log::info('[STOMP] Queue size: ' . $size);
-        return $size;
+        return $this->size($queue);
     }
 
     /**
@@ -90,9 +88,9 @@ class StompQueue extends BaseStompQueue
      */
     public function pop($queue = null)
     {
-        return tap(parent::pop($queue), function ($result) use ($queue) {
-            if ($result instanceof StompJob) {
-                $this->event($this->getQueue($queue), new JobReserved($result->getRawBody()));
+        return tap(parent::pop($queue), function ($job) use ($queue) {
+            if ($job instanceof StompJob) {
+                $this->event($this->getQueue($queue), new JobDeleted($job, $job->getRawBody()));
             }
         });
     }
@@ -107,7 +105,6 @@ class StompQueue extends BaseStompQueue
      */
     public function deleteReserved($queue, $job)
     {
-        Log::info('[STOMP] Deleting a reserved job: ' . print_r(['job' => $job, 'queue' => $queue], true));
         $this->event($this->getQueue($queue), new JobDeleted($job, $job->getRawBody()));
     }
 
@@ -121,16 +118,12 @@ class StompQueue extends BaseStompQueue
      */
     protected function event($queue, $event)
     {
-        Log::info('[STOMP] Firing event...');
-
         if ($this->container && $this->container->bound(Dispatcher::class)) {
             /**
              * @var JobPushed $connection
              * @var JobReserved $event
              */
             $connection = $event->connection($this->getConnectionName());
-
-            Log::info('[STOMP] Dispatching: ' . print_r($connection, true));
 
             $this->container->make(Dispatcher::class)->dispatch(
                 $connection->queue($queue)

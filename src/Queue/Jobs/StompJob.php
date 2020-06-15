@@ -28,11 +28,6 @@ class StompJob extends Job implements JobContract
         $this->container = $container;
         $this->stompQueue = $stompQueue;
         $this->frame = $frame;
-
-        Log::info('[STOMP] Creating a job with following data: ' . print_r([
-                'queue'     => $stompQueue->queue,
-                'frameBody' => $frame->body,
-            ], true));
     }
 
     /**
@@ -42,9 +37,7 @@ class StompJob extends Job implements JobContract
      */
     public function getJobId()
     {
-        $jobId = Arr::get($this->payload(), 'id', null);
-        Log::info("[STOMP] Job ID: {$jobId}");
-        return $jobId;
+        return Arr::get($this->payload(), 'id', null);
     }
 
     /**
@@ -54,7 +47,6 @@ class StompJob extends Job implements JobContract
      */
     public function getRawBody()
     {
-        Log::info("[STOMP] Raw frame body: {$this->frame->body}");
         return $this->frame->body;
     }
 
@@ -65,9 +57,7 @@ class StompJob extends Job implements JobContract
      */
     public function attempts()
     {
-        $attempts = Arr::get($this->payload(), 'attempts', 1);
-        Log::info("[STOMP] Attempts: {$attempts}");
-        return $attempts;
+        return Arr::get($this->payload(), 'attempts', 1);
     }
 
     /**
@@ -89,7 +79,6 @@ class StompJob extends Job implements JobContract
      */
     public function release($delay = 0)
     {
-        Log::info("[STOMP] Releasing...");
         parent::release($delay);
         $this->recreateJob($delay);
     }
@@ -102,7 +91,6 @@ class StompJob extends Job implements JobContract
      */
     protected function recreateJob($delay)
     {
-        Log::info("[STOMP] Recreating...");
         $payload = $this->payload();
         Arr::set($payload, 'attempts', Arr::get($payload, 'attempts', 1) + 1);
 
@@ -117,9 +105,7 @@ class StompJob extends Job implements JobContract
      */
     public function getName()
     {
-        $jobName = Arr::get($this->payload(), 'job');
-        Log::info("[STOMP] Job name: {$jobName}");
-        return $jobName;
+        return Arr::get($this->payload(), 'job');
     }
 
     /**
@@ -129,8 +115,6 @@ class StompJob extends Job implements JobContract
      */
     public function getQueue()
     {
-        $jobQueue = Arr::get($this->payload(), 'queue');
-        Log::info("[STOMP] Job queue name: {$jobQueue}");
-        return $jobQueue;
+        return Arr::get($this->payload(), 'queue');
     }
 }

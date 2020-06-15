@@ -1,11 +1,9 @@
 # Laravel Stomp driver
 
 This package enables usage of Stomp driver for queueing natively inside 
-Laravel.
+Laravel 7.
 
 PHP min version: 7.4.
-
-Laravel 7.4.
 
 ## Installation
 
@@ -21,73 +19,44 @@ connection driver in ``.env`` file:
 QUEUE_CONNECTION=stomp
 ```
 
-``.env`` variables and their explanation:
+``.env`` variables you can override:
 
 ```
-STOMP_QUEUE         queue name
+STOMP_QUEUE         queue name (defaults to 'default')
 STOMP_PROTOCOL      protocol (defaults to TCP)
-STOMP_HOST          broker host
-STOMP_PORT          port where STOMP is exposed in your broker
-STOMP_USERNAME      broker username
-STOMP_PASSWORD      broker password
-STOMP_VHOST         broker vhost
-STOMP_WORKER        job worker to be used
+STOMP_HOST          broker host (defaults to 127.0.0.1)
+STOMP_PORT          port where STOMP is exposed in your broker (defaults to 61613)
+STOMP_USERNAME      broker username (defaults to admin)
+STOMP_PASSWORD      broker password (defaults to admin)
+STOMP_WORKER        job worker to be used (defaults to 'default' can be 'horizon')
 ```
 
-If you take a look at libraries inner config you will see that
-every value has its default, so its not necessary to override
-all env keys if some values are matching. 
-
-Config file is automatically served so you don't need to explicitly
-add new keys to ``queue.php``, however if you should ever need to
-change how it behaves you can always include it by adding the 
-following under connections key:
+If ``horizon`` is used as worker, library will work side-by-side with 
+[Laravel Horizon](https://laravel.com/docs/7.x/horizon) and basic configuration will be 
+automatically resolved:
 
 ```
-'stomp' => [
-    'driver'   => 'stomp',
-    'queue'    => env('STOMP_QUEUE', 'default'),
-    'protocol' => env('STOMP_PROTOCOL', 'tcp'),
-    'host'     => env('STOMP_HOST', '127.0.0.1'),
-    'port'     => env('STOMP_PORT', 61613),
-    'username' => env('STOMP_USERNAME', 'admin'),
-    'password' => env('STOMP_PASSWORD', 'admin'),
-    'vhost'    => env('STOMP_VHOST', '/'),
+'environments' => [
+    'production' => [
+        'supervisor-1' => [
+            'connection' => 'stomp',
+            'queue' => [env('STOMP_QUEUE', 'default')],
+            ...
+        ],
+    ],
 
-    /*
-     * Job worker - 'default' or 'horizon'
-     */
-    'worker' => env('STOMP_WORKER', 'default'),
+    'local' => [
+        'supervisor-1' => [
+            'connection' => 'stomp',
+            'queue' => [env('STOMP_QUEUE', 'default')],
+            ...
+        ],
+    ],
 ],
 ```
 
-These are at the same time env variables you can use inside `.env`
-file to override default values. Since every value (in default
-configuration) has its own default, you can override only what's 
-different in your configuration, so doing this in ``.env`` is 
-valid as well:
-
-```
-STOMP_QUEUE=myQueue
-STOMP_PASSWORD=pa$$word123
-```
-
-Notice that unexpected things may happen if you decide to override 
-config values within ``queue.php`` by adding for example:
-
-```
-'stomp' => [
-    'host'     => '127.1.1.1',
-],
-```
-
-This will override default logic to fetch value from ``.env``, thus
-making this take precedence before default config and ``.env`` 
-so host will effectively be set to ``127.1.1.1`` independently of
-whether you actually have ``STOMP_HOST`` set or not. 
-
-That being said, it is best that you don't override config as 
-everything needed by library to run is exposed via env variables.
+If you need a custom configuration, publish Horizon config (check Horizon documentation)
+and adapt to your needs. 
 
 ## Usage
 

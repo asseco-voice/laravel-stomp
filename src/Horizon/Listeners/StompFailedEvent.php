@@ -36,7 +36,7 @@ class StompFailedEvent
      */
     public function handle(LaravelJobFailed $event): void
     {
-        Log::info('[STOMP] Job failed: ' . print_r(['event' => $event], true));
+        Log::error('[STOMP] Job failed: ' . print_r($event->exception, true));
 
         if (!$event->job instanceof StompJob) {
             return;
