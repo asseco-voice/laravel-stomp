@@ -94,7 +94,7 @@ class StompJob extends Job implements JobContract
         $payload = $this->payload();
         Arr::set($payload, 'attempts', Arr::get($payload, 'attempts', 1) + 1);
 
-        $this->stompQueue->recreate(json_encode($payload), $this->getQueue(), $delay);
+        $this->stompQueue->pushRaw(json_encode($payload), $this->getQueue());
     }
 
 

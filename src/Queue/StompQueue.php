@@ -7,7 +7,6 @@ use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Stomp\Client;
-use Stomp\Exception\ConnectionException;
 use Stomp\Exception\StompException;
 use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
@@ -27,27 +26,10 @@ class StompQueue extends Queue implements QueueInterface
      */
     public StatefulStomp $stompClient;
 
-    /**
-     * Current job being processed.
-     *
-     * @var StompJob
-     */
-    protected StompJob $currentJob;
-
-    protected Connection $connection;
-
-    /**
-     * StompQueue constructor.
-     * @param StatefulStomp $stompClient
-     * @param $queue
-     * @param $options
-     * @throws ConnectionException
-     */
     public function __construct()
     {
         $this->queue = StompConfig::get('queue');
-        $this->connection = $this->initConnection();
-        $client = new Client($this->connection);
+        $client = new Client($this->initConnection());
         $this->setCredentials($client);
         $client->setSync(false);
 
@@ -60,10 +42,6 @@ class StompQueue extends Queue implements QueueInterface
         }
     }
 
-    /**
-     * @return Connection
-     * @throws \Stomp\Exception\ConnectionException
-     */
     protected function initConnection(): Connection
     {
         $protocol = StompConfig::get('protocol');
@@ -73,9 +51,6 @@ class StompQueue extends Queue implements QueueInterface
         return new Connection("$protocol://$host:$port");
     }
 
-    /**
-     * @param Client $client
-     */
     protected function setCredentials(Client $client): void
     {
         $username = StompConfig::get('username');
@@ -127,19 +102,6 @@ class StompQueue extends Queue implements QueueInterface
         Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
         return $this->stompClient->send($queue, $message);
-    }
-
-    /**
-     * Push a raw payload onto the queue after encrypting the payload.
-     *
-     * @param string $payload
-     * @param string $queue
-     * @param int $delay
-     * @return mixed
-     */
-    public function recreate($payload, $queue, $delay)
-    {
-        return $this->pushRaw($payload, $queue, $delay);
     }
 
     /**
@@ -205,9 +167,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function close(): void
     {
-        if ($this->currentJob && !$this->currentJob->isDeletedOrReleased()) {
-            $this->connection->disconnect();
-        }
+        $this->stompClient->getClient()->disconnect();
     }
 
     /**

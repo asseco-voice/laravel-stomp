@@ -3,7 +3,6 @@
 namespace Voice\Stomp\Horizon;
 
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobDeleted;
 use Laravel\Horizon\Events\JobPushed;
 use Laravel\Horizon\Events\JobReserved;

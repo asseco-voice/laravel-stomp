@@ -5,6 +5,7 @@ namespace Voice\Stomp;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
 use Voice\Stomp\Queue\Connectors\StompConnector;
+use Voice\Stomp\Queue\StompConfig;
 
 class StompServiceProvider extends ServiceProvider
 {
@@ -31,7 +32,10 @@ class StompServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/config/stomp.php', 'queue.connections.stomp');
-        $this->mergeConfigFrom(__DIR__ . '/config/horizon.php', 'horizon');
+
+        if (StompConfig::get('worker') == 'horizon') {
+            $this->mergeConfigFrom(__DIR__ . '/config/horizon.php', 'horizon');
+        }
     }
 
 }
