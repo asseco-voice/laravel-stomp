@@ -1,9 +1,6 @@
 # Laravel Stomp driver
 
-This package enables usage of Stomp driver for queueing natively inside 
-Laravel 7.
-
-PHP min version: 7.4.
+This package enables usage of Stomp driver for queueing natively inside Laravel.
 
 ## Installation
 
@@ -61,5 +58,5 @@ and adapt to your needs.
 ## Usage
 
 You can use library now like being native Laravel queue. 
-For usage you can check 
-[official Laravel queue documentation](https://laravel.com/docs/7.x/queues)
+For usage, you can check 
+[official Laravel queue documentation](https://laravel.com/docs/7.x/queues).
