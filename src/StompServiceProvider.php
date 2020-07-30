@@ -10,21 +10,6 @@ use Voice\Stomp\Queue\StompConfig;
 class StompServiceProvider extends ServiceProvider
 {
     /**
-     * Bootstrap any application services.
-     *
-     * @return void
-     */
-    public function boot()
-    {
-        /** @var QueueManager $queue */
-        $queue = $this->app['queue'];
-
-        $queue->addConnector('stomp', function () {
-            return new StompConnector($this->app['events']);
-        });
-    }
-
-    /**
      * Register any application services.
      *
      * @return void
@@ -38,4 +23,18 @@ class StompServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        /** @var QueueManager $queue */
+        $queue = $this->app['queue'];
+
+        $queue->addConnector('stomp', function () {
+            return new StompConnector($this->app['events']);
+        });
+    }
 }
