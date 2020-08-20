@@ -23,11 +23,13 @@ class StompJob extends Job implements JobContract
      */
     protected Frame $frame;
 
-    public function __construct(Container $container, StompQueue $stompQueue, Frame $frame)
+    public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
         $this->container = $container;
         $this->stompQueue = $stompQueue;
         $this->frame = $frame;
+        $this->connectionName = 'stomp';
+        $this->queue = $queue;
     }
 
     /**
@@ -68,7 +70,11 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         parent::delete();
-        $this->stompQueue->deleteMessage($this->getQueue(), $this->frame);
+
+        Log::info('[STOMP] Deleting a message from queue: ' . print_r([
+                'queue'   => $this->queue,
+                'message' => $this->frame,
+            ], true));
     }
 
     /**
@@ -94,9 +100,8 @@ class StompJob extends Job implements JobContract
         $payload = $this->payload();
         Arr::set($payload, 'attempts', Arr::get($payload, 'attempts', 1) + 1);
 
-        $this->stompQueue->pushRaw(json_encode($payload), $this->getQueue());
+        $this->stompQueue->pushRaw(json_encode($payload), $this->queue);
     }
-
 
     /**
      * Get the name of the queued job class.
@@ -106,15 +111,5 @@ class StompJob extends Job implements JobContract
     public function getName()
     {
         return Arr::get($this->payload(), 'job');
-    }
-
-    /**
-     * Get the name of the queue the job belongs to.
-     *
-     * @return string
-     */
-    public function getQueue()
-    {
-        return Arr::get($this->payload(), 'queue');
     }
 }

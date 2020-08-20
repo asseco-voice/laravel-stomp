@@ -140,7 +140,7 @@ class StompQueue extends Queue implements QueueInterface
 
         Log::info('[STOMP] Popping a job from queue: ' . print_r($job, true));
 
-        return new StompJob($this->container, $this, $job);
+        return new StompJob($this->container, $this, $job, $this->getQueue($queue));
     }
 
 
@@ -190,22 +190,4 @@ class StompQueue extends Queue implements QueueInterface
     {
         return Str::random(32);
     }
-
-    /**
-     * Delete a message from the Stomp queue.
-     *
-     * @param string $queue
-     * @param string|Frame $message
-     * @return void
-     */
-    public function deleteMessage($queue, Frame $message)
-    {
-        Log::info('[STOMP] Deleting a message from queue: ' . print_r([
-                'queue'   => $queue,
-                'message' => $message,
-            ], true));
-
-        // $this->stompClient->ack($message); // subscribe je zapravo ack...recimo...
-    }
-
 }
