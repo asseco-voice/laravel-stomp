@@ -146,7 +146,7 @@ class StompJob extends Job implements JobContract
         $payload = $this->payload();
 
         // Handle plain Laravel jobs
-        if (array_key_exists('job', $payload)) {
+        if ($payload && array_key_exists('job', $payload)) {
             [$class, $method] = JobName::parse($payload['job']);
 
             if (method_exists($this->instance = $this->resolve($class), 'failed')) {

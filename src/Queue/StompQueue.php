@@ -36,7 +36,7 @@ class StompQueue extends Queue implements QueueInterface
         try {
             $client->connect();
             $this->stompClient = new StatefulStomp($client);
-            Log::info('[STOMP] Queue initialized successfully.');
+            Log::info('[STOMP] Connected successfully.');
         } catch (StompException $e) {
             Log::error('[STOMP] Connection failed: ' . print_r($e->getMessage(), true));
         }
@@ -127,10 +127,10 @@ class StompQueue extends Queue implements QueueInterface
     public function pop($queue = null)
     {
         try {
-            $this->stompClient->subscribe($this->getQueue($queue));
+            $this->subscribeToQueues();
             $job = $this->stompClient->read();
         } catch (\Exception $e) {
-            Log::error('[STOMP] Stomp failed to subscribe.');
+            Log::error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
             return null;
         }
 
@@ -190,4 +190,19 @@ class StompQueue extends Queue implements QueueInterface
     {
         return Str::random(32);
     }
+
+    protected function subscribeToQueues(): void
+    {
+        $queues = $this->parseMultiQueue($this->queue);
+
+        foreach ($queues as $queue) {
+            $this->stompClient->subscribe($this->getQueue($queue));
+        }
+    }
+
+    protected function parseMultiQueue(string $queue): array
+    {
+        return explode(';', $queue);
+    }
+
 }
