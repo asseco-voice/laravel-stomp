@@ -57,6 +57,18 @@ automatically resolved:
 If you need a custom configuration, publish Horizon config (check Horizon documentation)
 and adapt to your needs. 
 
+## Non-Laravel events
+
+It is possible to handle outside events as well. By default, if event is not a standard Laravel event it 
+gets re-thrown as a ``stomp.event`` with payload it received. You can listen to it by including this in 
+``EventServiceProvider::boot()``:
+
+```
+Event::listen('stomp.event', function ($payload) {
+    ...
+});
+```
+
 ## Usage
 
 You can use library now like being native Laravel queue. 
