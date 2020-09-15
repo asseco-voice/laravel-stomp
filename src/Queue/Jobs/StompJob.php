@@ -5,10 +5,12 @@ namespace Voice\Stomp\Queue\Jobs;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
+use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
-use Voice\Stomp\Queue\StompQueue;
 use Stomp\Transport\Frame;
+use Voice\Stomp\Queue\StompQueue;
 
 class StompJob extends Job implements JobContract
 {
@@ -50,6 +52,26 @@ class StompJob extends Job implements JobContract
     public function getRawBody()
     {
         return $this->frame->body;
+    }
+
+    /**
+     * Fire the job.
+     *
+     * @return void
+     */
+    public function fire()
+    {
+        $payload = $this->payload();
+
+        // Handle plain Laravel jobs
+        if (array_key_exists('job', $payload)) {
+            [$class, $method] = JobName::parse($payload['job']);
+            ($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
+            return;
+        }
+
+        // Handle events from other services
+        Event::dispatch('stomp.event', $payload);
     }
 
     /**
@@ -110,6 +132,26 @@ class StompJob extends Job implements JobContract
      */
     public function getName()
     {
-        return Arr::get($this->payload(), 'job');
+        return Arr::get($this->payload(), 'job') ?: 'stomp.event';
+    }
+
+    /**
+     * Process an exception that caused the job to fail.
+     *
+     * @param  \Throwable|null  $e
+     * @return void
+     */
+    protected function failed($e)
+    {
+        $payload = $this->payload();
+
+        // Handle plain Laravel jobs
+        if (array_key_exists('job', $payload)) {
+            [$class, $method] = JobName::parse($payload['job']);
+
+            if (method_exists($this->instance = $this->resolve($class), 'failed')) {
+                $this->instance->failed($payload['data'], $e);
+            }
+        }
     }
 }
