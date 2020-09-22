@@ -71,7 +71,10 @@ class StompJob extends Job implements JobContract
         }
 
         // Handle events from other services
-        Event::dispatch('stomp.event', $payload);
+        Event::dispatch('stomp.event', [
+            'headers' => $this->frame->getHeaders(),
+            'body'    => $payload
+        ]);
     }
 
     /**
@@ -138,7 +141,7 @@ class StompJob extends Job implements JobContract
     /**
      * Process an exception that caused the job to fail.
      *
-     * @param  \Throwable|null  $e
+     * @param \Throwable|null $e
      * @return void
      */
     protected function failed($e)
