@@ -63,18 +63,12 @@ class StompJob extends Job implements JobContract
     {
         $payload = $this->payload();
 
-        // Handle plain Laravel jobs
         if (array_key_exists('job', $payload)) {
-            [$class, $method] = JobName::parse($payload['job']);
-            ($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
+            $this->handleLaravelJobs($payload);
             return;
         }
 
-        // Handle events from other services
-        Event::dispatch('stomp.event', [
-            'headers' => $this->frame->getHeaders(),
-            'body'    => $payload
-        ]);
+        $this->handleOutsideJobs($payload);
     }
 
     /**
@@ -156,5 +150,26 @@ class StompJob extends Job implements JobContract
                 $this->instance->failed($payload['data'], $e);
             }
         }
+    }
+
+    protected function handleLaravelJobs(array $payload): void
+    {
+        [$class, $method] = JobName::parse($payload['job']);
+        ($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
+    }
+
+    protected function handleOutsideJobs(array $payload): void
+    {
+        $eventName = 'event';
+        $subscribedTo = $this->stompQueue->stompClient->getSubscriptions()->getSubscription($this->frame)->getDestination();
+
+        if($subscribedTo){
+            $eventName = str_replace('::', '.', $subscribedTo);
+        }
+
+        Event::dispatch("stomp.$eventName", [
+            'headers' => $this->frame->getHeaders(),
+            'body'    => $payload
+        ]);
     }
 }
