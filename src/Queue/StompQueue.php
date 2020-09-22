@@ -22,6 +22,12 @@ class StompQueue extends Queue implements QueueInterface
     public string $queue;
 
     /**
+     * List of queues already subscribed to. Preventing multiple same subscriptions
+     * @var array
+     */
+    protected array $subscribedTo = [];
+
+    /**
      * Stomp instance from stomp-php repo
      */
     public StatefulStomp $stompClient;
@@ -196,7 +202,15 @@ class StompQueue extends Queue implements QueueInterface
         $queues = $this->parseMultiQueue($this->queue);
 
         foreach ($queues as $queue) {
-            $this->stompClient->subscribe($this->getQueue($queue));
+            $alreadySubscribed = in_array($queue, $this->subscribedTo);
+
+            if ($alreadySubscribed) {
+                continue;
+            }
+
+            $getQueue = $this->getQueue($queue);
+            $this->stompClient->subscribe($getQueue);
+            $this->subscribedTo[] = $getQueue;
         }
     }
 
