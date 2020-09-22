@@ -60,11 +60,16 @@ and adapt to your needs.
 ## Non-Laravel events
 
 It is possible to handle outside events as well. By default, if event is not a standard Laravel event it 
-gets re-thrown as a ``stomp.event`` with payload it received. You can listen to it by including this in 
+gets re-thrown as a ``stomp.*`` event with payload it received. 
+
+If the frame you received belongs to a ``topic::test_queue`` queue, system will throw a `stomp.topic.test_queue` event,
+otherwise if for some reason the queue name can't be parsed it will dispatch a ``stomp.event`` event. 
+
+You can listen to it by including this in 
 ``EventServiceProvider::boot()``:
 
 ```
-Event::listen('stomp.event', function ($payload) {
+Event::listen('stomp.*', function ($event, $payload) {
     ...
 });
 ```
