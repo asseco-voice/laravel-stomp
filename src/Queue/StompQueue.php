@@ -54,7 +54,11 @@ class StompQueue extends Queue implements QueueInterface
         $host = StompConfig::get('host');
         $port = StompConfig::get('port');
 
-        return new Connection("$protocol://$host:$port");
+        $connection = new Connection("$protocol://$host:$port");
+
+        $connection->setReadTimeout(30, 0);
+
+        return $connection;
     }
 
     protected function setCredentials(Client $client): void
