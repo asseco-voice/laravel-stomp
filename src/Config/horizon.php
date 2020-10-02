@@ -17,7 +17,7 @@ return [
         'production' => [
             'supervisor-1' => [
                 'connection' => 'stomp',
-                'queue' => [env('STOMP_QUEUE', 'default')],
+                'queue' => [env('STOMP_READ_QUEUES', 'default')],
                 'balance' => 'simple',
                 'processes' => 10,
                 'tries' => 1,
@@ -27,7 +27,7 @@ return [
         'local' => [
             'supervisor-1' => [
                 'connection' => 'stomp',
-                'queue' => [env('STOMP_QUEUE', 'default')],
+                'queue' => [env('STOMP_READ_QUEUES', 'default')],
                 'balance' => 'simple',
                 'processes' => 3,
                 'tries' => 1,

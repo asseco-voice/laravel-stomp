@@ -22,6 +22,12 @@ class StompQueue extends Queue implements QueueInterface
     public string $queue;
 
     /**
+     * Queue to write to.
+     * @var string
+     */
+    public string $writeQueue;
+
+    /**
      * List of queues already subscribed to. Preventing multiple same subscriptions
      * @var array
      */
@@ -34,7 +40,8 @@ class StompQueue extends Queue implements QueueInterface
 
     public function __construct()
     {
-        $this->queue = StompConfig::get('queue');
+        $this->queue = StompConfig::get('read_queues');
+        $this->writeQueue = StompConfig::get('write_queue');
         $client = new Client($this->initConnection());
         $this->setCredentials($client);
         $client->setSync(false);
@@ -107,7 +114,7 @@ class StompQueue extends Queue implements QueueInterface
     public function pushRaw($payload, $queue = null, array $options = [])
     {
         $message = new Message($payload, $options);
-        $queue = $this->getQueue($queue);
+        $queue = $this->getWriteQueue();
 
         Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
@@ -203,7 +210,7 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function subscribeToQueues(): void
     {
-        $queues = $this->parseMultiQueue($this->queue);
+        $queues = $this->parseDelimitedQueues($this->queue);
 
         foreach ($queues as $queue) {
             $alreadySubscribed = in_array($queue, $this->subscribedTo);
@@ -218,9 +225,15 @@ class StompQueue extends Queue implements QueueInterface
         }
     }
 
-    protected function parseMultiQueue(string $queue): array
+    protected function parseDelimitedQueues(string $queue): array
     {
         return explode(';', $queue);
     }
 
+    protected function getWriteQueue()
+    {
+        $queues = $this->parseDelimitedQueues($this->writeQueue);
+
+        return $queues[0];
+    }
 }
