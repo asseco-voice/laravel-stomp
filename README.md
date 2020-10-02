@@ -19,7 +19,8 @@ QUEUE_CONNECTION=stomp
 ``.env`` variables you can override:
 
 ```
-STOMP_READ_QUEUES   queue(s) name (defaults to 'default')
+STOMP_READ_QUEUES   queue(s) name to read from (defaults to 'default')
+STOMP_WRITE_QUEUE   queue name to write to (defaults to first read queue)
 STOMP_PROTOCOL      protocol (defaults to TCP)
 STOMP_HOST          broker host (defaults to 127.0.0.1)
 STOMP_PORT          port where STOMP is exposed in your broker (defaults to 61613)
@@ -29,6 +30,9 @@ STOMP_WORKER        job worker to be used (defaults to 'default' can be 'horizon
 ```
 
 If you want to subscribe on multiple queues, use ``;`` as a separator between them: `STOMP_READ_QUEUES=queue1;queue2`
+
+The package will always write to a single queue, so be sure to include a
+``STOMP_WRITE_QUEUE`` in case `STOMP_READ_QUEUES` has multiple queues to read from.
 
 If ``horizon`` is used as worker, library will work side-by-side with 
 [Laravel Horizon](https://laravel.com/docs/7.x/horizon) and basic configuration will be 
