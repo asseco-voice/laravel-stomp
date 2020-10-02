@@ -21,6 +21,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     public string $queue;
 
+    public Connection $connection;
+
     /**
      * Queue to write to.
      * @var string
@@ -61,11 +63,11 @@ class StompQueue extends Queue implements QueueInterface
         $host = StompConfig::get('host');
         $port = StompConfig::get('port');
 
-        $connection = new Connection("$protocol://$host:$port");
+        $this->connection = new Connection("$protocol://$host:$port");
 
-        $connection->setReadTimeout(30, 0);
+        $this->connection->setReadTimeout(30, 0);
 
-        return $connection;
+        return $this->connection;
     }
 
     protected function setCredentials(Client $client): void
@@ -144,6 +146,7 @@ class StompQueue extends Queue implements QueueInterface
     public function pop($queue = null)
     {
         try {
+            $this->connection->sendAlive();
             $this->subscribeToQueues();
             $job = $this->stompClient->read();
         } catch (\Exception $e) {

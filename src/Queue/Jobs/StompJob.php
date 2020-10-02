@@ -9,6 +9,7 @@ use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Stomp\Transport\Frame;
 use Voice\Stomp\Queue\StompQueue;
 
@@ -147,7 +148,7 @@ class StompJob extends Job implements JobContract
             [$class, $method] = JobName::parse($payload['job']);
 
             if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-                $this->instance->failed($payload['data'], $e);
+                $this->instance->failed($payload['data'], $e, Str::uuid());
             }
         }
     }
@@ -171,5 +172,10 @@ class StompJob extends Job implements JobContract
             'headers' => $this->frame->getHeaders(),
             'body'    => $payload
         ]);
+    }
+
+    public function retryUntil()
+    {
+        // TODO: Implement retryUntil() method.
     }
 }
