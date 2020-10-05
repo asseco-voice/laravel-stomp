@@ -128,7 +128,7 @@ class StompQueue extends Queue implements QueueInterface
 
         Log::info('[STOMP] Popping a job from queue: ' . print_r($job, true));
 
-        return new StompJob($this->container, $this, $job, $this->getReadQueues($queue));
+        return new StompJob($this->container, $this, $job, $this->getQueue($job));
     }
 
 
@@ -206,5 +206,10 @@ class StompQueue extends Queue implements QueueInterface
         $queues = $this->parseDelimitedQueues($this->writeQueue);
 
         return $queues[0];
+    }
+
+    public function getQueue(Frame $frame)
+    {
+        return $this->client->getSubscriptions()->getSubscription($frame)->getDestination();
     }
 }
