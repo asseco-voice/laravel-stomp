@@ -15,5 +15,7 @@ class ConnectionWrapper
         $port = ConfigWrapper::get('port');
 
         $this->connection = new Connection("$protocol://$host:$port");
+
+        $this->connection->setReadTimeout(30, 0);
     }
 }
