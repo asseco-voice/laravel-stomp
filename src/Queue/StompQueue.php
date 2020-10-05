@@ -2,26 +2,27 @@
 
 namespace Voice\Stomp\Queue;
 
+use DateInterval;
+use DateTimeInterface;
+use Exception;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Stomp\Client;
-use Stomp\Exception\StompException;
-use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
 use Voice\Stomp\Queue\Jobs\StompJob;
+use Voice\Stomp\Queue\Stomp\ClientWrapper;
+use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 
 class StompQueue extends Queue implements QueueInterface
 {
     /**
      * Queue name
      */
-    public string $queue;
-
-    public Connection $connection;
+    public string $readQueues;
 
     /**
      * Queue to write to.
@@ -38,46 +39,13 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Stomp instance from stomp-php repo
      */
-    public StatefulStomp $stompClient;
+    public StatefulStomp $client;
 
-    public function __construct()
+    public function __construct(ClientWrapper $stompClient)
     {
-        $this->queue = StompConfig::get('read_queues');
-        $this->writeQueue = StompConfig::get('write_queue');
-        $client = new Client($this->initConnection());
-        $this->setCredentials($client);
-        $client->setSync(false);
-
-        try {
-            $client->connect();
-            $this->stompClient = new StatefulStomp($client);
-            Log::info('[STOMP] Connected successfully.');
-        } catch (StompException $e) {
-            Log::error('[STOMP] Connection failed: ' . print_r($e->getMessage(), true));
-        }
-    }
-
-    protected function initConnection(): Connection
-    {
-        $protocol = StompConfig::get('protocol');
-        $host = StompConfig::get('host');
-        $port = StompConfig::get('port');
-
-        $this->connection = new Connection("$protocol://$host:$port");
-
-        $this->connection->setReadTimeout(30, 0);
-
-        return $this->connection;
-    }
-
-    protected function setCredentials(Client $client): void
-    {
-        $username = StompConfig::get('username');
-        $password = StompConfig::get('password');
-
-        if ($username && $password) {
-            $client->setLogin($username, $password);
-        }
+        $this->readQueues = ConfigWrapper::get('read_queues');
+        $this->writeQueue = ConfigWrapper::get('write_queue');
+        $this->client = $stompClient->client;
     }
 
     /**
@@ -120,13 +88,13 @@ class StompQueue extends Queue implements QueueInterface
 
         Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
-        return $this->stompClient->send($queue, $message);
+        return $this->client->send($queue, $message);
     }
 
     /**
      * Push a new job onto the queue after a delay.
      *
-     * @param \DateTimeInterface|\DateInterval|int $delay
+     * @param DateTimeInterface|DateInterval|int $delay
      * @param string|object $job
      * @param mixed $data
      * @param string|null $queue
@@ -141,15 +109,15 @@ class StompQueue extends Queue implements QueueInterface
      * Pop the next job off of the queue.
      *
      * @param string|null $queue
-     * @return \Illuminate\Contracts\Queue\Job|null
+     * @return Job|null
      */
     public function pop($queue = null)
     {
         try {
-            $this->connection->sendAlive();
+            $this->client->getClient()->getConnection()->sendAlive();
             $this->subscribeToQueues();
-            $job = $this->stompClient->read();
-        } catch (\Exception $e) {
+            $job = $this->client->read();
+        } catch (Exception $e) {
             Log::error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
             return null;
         }
@@ -160,7 +128,7 @@ class StompQueue extends Queue implements QueueInterface
 
         Log::info('[STOMP] Popping a job from queue: ' . print_r($job, true));
 
-        return new StompJob($this->container, $this, $job, $this->getQueue($queue));
+        return new StompJob($this->container, $this, $job, $this->getReadQueues($queue));
     }
 
 
@@ -175,7 +143,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function createPayloadArray($job, $queue, $data = '')
     {
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id'  => $this->getRandomId(),
+            'id' => $this->getRandomId(),
             'raw' => $job,
         ]);
     }
@@ -187,7 +155,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function close(): void
     {
-        $this->stompClient->getClient()->disconnect();
+        $this->client->getClient()->disconnect();
     }
 
     /**
@@ -196,9 +164,9 @@ class StompQueue extends Queue implements QueueInterface
      * @param string|null $queue
      * @return string
      */
-    public function getQueue($queue)
+    public function getReadQueues($queue)
     {
-        return $queue ?: $this->queue;
+        return $queue ?: $this->readQueues;
     }
 
     /**
@@ -213,7 +181,7 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function subscribeToQueues(): void
     {
-        $queues = $this->parseDelimitedQueues($this->queue);
+        $queues = $this->parseDelimitedQueues($this->readQueues);
 
         foreach ($queues as $queue) {
             $alreadySubscribed = in_array($queue, $this->subscribedTo);
@@ -222,8 +190,8 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $getQueue = $this->getQueue($queue);
-            $this->stompClient->subscribe($getQueue);
+            $getQueue = $this->getReadQueues($queue);
+            $this->client->subscribe($getQueue);
             $this->subscribedTo[] = $getQueue;
         }
     }

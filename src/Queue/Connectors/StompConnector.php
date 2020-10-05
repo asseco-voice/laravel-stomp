@@ -6,9 +6,10 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\WorkerStopping;
+use Illuminate\Support\Facades\App;
 use Voice\Stomp\Horizon\Listeners\StompFailedEvent;
 use Voice\Stomp\Horizon\StompQueue as HorizonStompQueue;
-use Voice\Stomp\Queue\StompConfig;
+use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 use Voice\Stomp\Queue\StompQueue;
 
 class StompConnector implements ConnectorInterface
@@ -50,11 +51,11 @@ class StompConnector implements ConnectorInterface
      */
     public function selectWorker()
     {
-        switch (StompConfig::get('worker')) {
+        switch (ConfigWrapper::get('worker')) {
             case 'horizon':
-                return new HorizonStompQueue();
+                return App::make(HorizonStompQueue::class);
             default:
-                return new StompQueue();
+                return App::make(StompQueue::class);
         }
     }
 }

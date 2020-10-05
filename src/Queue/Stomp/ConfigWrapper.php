@@ -1,10 +1,10 @@
 <?php
 
-namespace Voice\Stomp\Queue;
+namespace Voice\Stomp\Queue\Stomp;
 
 use Illuminate\Support\Facades\Config;
 
-class StompConfig
+class ConfigWrapper
 {
     const CONFIG_ARRAY_PATH = 'queue.connections.stomp.';
 

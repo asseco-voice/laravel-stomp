@@ -162,7 +162,7 @@ class StompJob extends Job implements JobContract
     protected function handleOutsideJobs(array $payload): void
     {
         $eventName = 'event';
-        $subscribedTo = $this->stompQueue->stompClient->getSubscriptions()->getSubscription($this->frame)->getDestination();
+        $subscribedTo = $this->stompQueue->client->getSubscriptions()->getSubscription($this->frame)->getDestination();
 
         if($subscribedTo){
             $eventName = str_replace('::', '.', $subscribedTo);
