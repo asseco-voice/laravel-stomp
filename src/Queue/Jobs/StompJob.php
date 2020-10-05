@@ -42,7 +42,15 @@ class StompJob extends Job implements JobContract
      */
     public function getJobId()
     {
-        return Arr::get($this->payload(), 'id', null);
+
+        $jobId = Arr::get($this->payload(), 'id', null);
+
+        // Assemble JobId for non-Laravel events
+        if (!$jobId) {
+            $jobId = Arr::get($this->frame->getHeaders(), 'message-id', null);
+        }
+
+        return $jobId;
     }
 
     /**
@@ -130,7 +138,19 @@ class StompJob extends Job implements JobContract
      */
     public function getName()
     {
-        return Arr::get($this->payload(), 'job') ?: 'stomp.event';
+        $jobName = Arr::get($this->payload(), 'job');
+
+        // Assemble the name for non-Laravel events
+        if (!$jobName) {
+            $jobName = 'event';
+            $subscribedTo = $this->stompQueue->client->getSubscriptions()->getSubscription($this->frame)->getDestination();
+
+            if ($subscribedTo) {
+                $jobName = 'stomp.' . str_replace('::', '.', $subscribedTo);
+            }
+        }
+
+        return $jobName;
     }
 
     /**
@@ -148,7 +168,7 @@ class StompJob extends Job implements JobContract
             [$class, $method] = JobName::parse($payload['job']);
 
             if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-                $this->instance->failed($payload['data'], $e, Str::uuid());
+                $this->instance->failed($payload['data'], $e, $payload['id']);
             }
         }
     }
@@ -161,14 +181,7 @@ class StompJob extends Job implements JobContract
 
     protected function handleOutsideJobs(array $payload): void
     {
-        $eventName = 'event';
-        $subscribedTo = $this->stompQueue->client->getSubscriptions()->getSubscription($this->frame)->getDestination();
-
-        if($subscribedTo){
-            $eventName = str_replace('::', '.', $subscribedTo);
-        }
-
-        Event::dispatch("stomp.$eventName", [
+        Event::dispatch($this->getName(), [
             'headers' => $this->frame->getHeaders(),
             'body'    => $payload
         ]);

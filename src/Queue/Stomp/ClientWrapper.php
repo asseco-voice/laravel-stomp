@@ -2,27 +2,27 @@
 
 namespace Voice\Stomp\Queue\Stomp;
 
-use Illuminate\Support\Facades\Log;
 use Stomp\Client;
-use Stomp\Exception\StompException;
 use Stomp\StatefulStomp;
 
 class ClientWrapper
 {
     public StatefulStomp $client;
 
+    /**
+     * ClientWrapper constructor.
+     * @param ConnectionWrapper $connectionWrapper
+     * @throws \Stomp\Exception\StompException
+     */
     public function __construct(ConnectionWrapper $connectionWrapper)
     {
         $client = new Client($connectionWrapper->connection);
+
         $client->setSync(false);
 
         $this->setCredentials($client);
 
-        try {
-            $client->connect();
-        } catch (StompException $e) {
-            Log::error('[STOMP] Connection failed: ' . print_r($e->getMessage(), true));
-        }
+        $client->connect();
 
         $this->client = new StatefulStomp($client);
     }

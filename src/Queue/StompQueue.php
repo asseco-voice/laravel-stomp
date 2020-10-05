@@ -143,7 +143,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function createPayloadArray($job, $queue, $data = '')
     {
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id' => $this->getRandomId(),
+            'id'  => $this->getRandomId(),
             'raw' => $job,
         ]);
     }
@@ -164,7 +164,7 @@ class StompQueue extends Queue implements QueueInterface
      * @param string|null $queue
      * @return string
      */
-    public function getReadQueues($queue)
+    public function getReadQueues(?string $queue)
     {
         return $queue ?: $this->readQueues;
     }
@@ -176,7 +176,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function getRandomId(): string
     {
-        return Str::random(32);
+        return Str::uuid();
     }
 
     protected function subscribeToQueues(): void
