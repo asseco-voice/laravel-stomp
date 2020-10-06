@@ -25,6 +25,11 @@ class StompJob extends Job implements JobContract
      */
     protected Frame $frame;
 
+    public function maxTries()
+    {
+        return parent::maxTries() ?: 3;
+    }
+
     public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
         $this->container = $container;
