@@ -41,7 +41,6 @@ class StompJob extends Job implements JobContract
      */
     public function getJobId()
     {
-
         $jobId = Arr::get($this->payload(), 'id', null);
 
         // Assemble JobId for non-Laravel events
@@ -125,9 +124,14 @@ class StompJob extends Job implements JobContract
     protected function recreateJob($delay)
     {
         $payload = $this->payload();
-        Arr::set($payload, 'attempts', Arr::get($payload, 'attempts', 1) + 1);
 
-        $this->stompQueue->pushRaw(json_encode($payload), $this->queue);
+        $attempts = Arr::get($payload, 'attempts', 0) + 1;
+        $backoff = pow(Arr::get($payload, 'backoff', 2), 2);
+
+        Arr::set($payload, 'attempts', $attempts);
+        Arr::set($payload, 'backoff', $backoff);
+
+        $this->stompQueue->recreate(json_encode($payload), $this->queue, $delay);
     }
 
     /**
@@ -184,10 +188,5 @@ class StompJob extends Job implements JobContract
             'headers' => $this->frame->getHeaders(),
             'body'    => $payload
         ]);
-    }
-
-    public function retryUntil()
-    {
-        // TODO: Implement retryUntil() method.
     }
 }

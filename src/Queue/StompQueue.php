@@ -74,6 +74,29 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * Recreate a payload for delayed re-delivery
+     *
+     * @param string $payload
+     * @param null $queue
+     * @param int $delay
+     * @return mixed
+     */
+    public function recreate(string $payload, $queue, int $delay)
+    {
+        return $this->pushRaw($payload, $queue, $this->makeDelayHeader($delay));
+    }
+
+    /**
+     * @param int $delay
+     * @return array
+     */
+    protected function makeDelayHeader($delay)
+    {
+        // TODO: remove ActiveMq hard coding
+        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
+    }
+
+    /**
      * Push a raw payload onto the queue.
      *
      * @param string $payload
