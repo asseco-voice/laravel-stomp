@@ -78,6 +78,28 @@ Event::listen('stomp.*', function ($event, $payload) {
 });
 ```
 
+## Failed jobs
+
+For the sake of simplicity and brevity ``StompJob`` class is defined in a way to utilize Laravel tries and
+backoff properties out of the box ([official documentation](https://laravel.com/docs/8.x/queues#dealing-with-failed-jobs)). 
+
+Upon failure, jobs will retry 3 times before being written to ``failed_jobs`` table.
+
+Each subsequent attempt will be tried in ``attempt^2`` seconds, meaning if it is a third attempt, it will retry in 9s after 
+the previous job failure. 
+
+Note that **job properties by default have precedence over CLI commands**, thus with these defaults in place
+the flags ``--tries`` and `--backoff` will be overridden. 
+
+You can turn off this behavior with following ``env`` variables:
+
+- `STOMP_AUTO_TRIES` - defaults to `true`. Set to `false` to revert to Laravel default of `0` retries. 
+- `STOMP_AUTO_BACKOFF` - defaults to `true`. Set to `false` to revert to Laravel default of `0s` backoff. 
+- `STOMP_BACKOFF_MULTIPLIER` - defaults to `2`. Does nothing if `STOMP_AUTO_BACKOFF` is turned off. Increase to 
+make even bigger interval between two failed jobs. 
+
+Job will be re-queued to the queue it came from.
+
 ## Usage
 
 You can use library now like being native Laravel queue. 
