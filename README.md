@@ -104,4 +104,4 @@ Job will be re-queued to the queue it came from.
 
 You can use library now like being native Laravel queue. 
 For usage, you can check 
-[official Laravel queue documentation](https://laravel.com/docs/7.x/queues).
+[official Laravel queue documentation](https://laravel.com/docs/8.x/queues).
