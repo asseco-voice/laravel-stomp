@@ -10,10 +10,13 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Stomp\Transport\Frame;
+use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 use Voice\Stomp\Queue\StompQueue;
 
 class StompJob extends Job implements JobContract
 {
+    protected const DEFAULT_TRIES = 3;
+
     /**
      * The Stomp instance.
      */
@@ -25,11 +28,6 @@ class StompJob extends Job implements JobContract
      */
     protected Frame $frame;
 
-    public function maxTries()
-    {
-        return parent::maxTries() ?: 3;
-    }
-
     public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
         $this->container = $container;
@@ -37,6 +35,15 @@ class StompJob extends Job implements JobContract
         $this->frame = $frame;
         $this->connectionName = 'stomp';
         $this->queue = $queue;
+    }
+
+    public function maxTries()
+    {
+        if (ConfigWrapper::get('auto_tries')) {
+            return self::DEFAULT_TRIES;
+        }
+
+        return parent::maxTries();
     }
 
     /**
@@ -117,24 +124,13 @@ class StompJob extends Job implements JobContract
     public function release($delay = 0)
     {
         parent::release($delay);
-        $this->recreateJob($delay);
-    }
 
-    /**
-     * Release a pushed job back onto the queue.
-     *
-     * @param int $delay
-     * @return void
-     */
-    protected function recreateJob($delay)
-    {
         $payload = $this->payload();
 
-        $attempts = Arr::get($payload, 'attempts', 0) + 1;
-        $backoff = pow(Arr::get($payload, 'backoff', 2), 2);
-
+        $attempts = Arr::get($payload, 'attempts', 1) + 1;
         Arr::set($payload, 'attempts', $attempts);
-        Arr::set($payload, 'backoff', $backoff);
+
+        $payload = $this->calculateAutoBackoff($attempts, $payload);
 
         $this->stompQueue->recreate(json_encode($payload), $this->queue, $delay);
     }
@@ -193,5 +189,22 @@ class StompJob extends Job implements JobContract
             'headers' => $this->frame->getHeaders(),
             'body'    => $payload
         ]);
+    }
+
+    /**
+     * @param int $attempts
+     * @param array $payload
+     * @return array
+     */
+    protected function calculateAutoBackoff(int $attempts, array $payload): array
+    {
+        if (!ConfigWrapper::get('auto_backoff')) {
+            return $payload;
+        }
+
+        $backoff = pow($attempts, ConfigWrapper::get('backoff_multiplier'));
+        Arr::set($payload, 'backoff', $backoff);
+
+        return $payload;
     }
 }

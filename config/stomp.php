@@ -15,4 +15,23 @@ return [
      * Set to "horizon" if you wish to use Laravel Horizon.
      */
     'worker'      => env('STOMP_WORKER', 'default'),
+
+    /**
+     * Calculate tries and backoff automatically without the need to specify it
+     * in the queue work command
+     */
+    'auto_tries' => true,
+    'auto_backoff' => true,
+
+    /**
+     * Incremental multiplier for failed job redelivery.
+     * Multiplier 2 means that the rescheduled job will be repeated in attempt^2 seconds.
+     *
+     * For 3 tries this means:
+     *
+     * attempt 2 - 4s
+     * attempt 3 - 9s
+     * attempt 4 - 16s
+     */
+    'backoff_multiplier' => 2,
 ];

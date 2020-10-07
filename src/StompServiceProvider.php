@@ -20,10 +20,10 @@ class StompServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . '/Config/stomp.php', 'queue.connections.stomp');
+        $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
 
         if (ConfigWrapper::get('worker') == 'horizon') {
-            $this->mergeConfigFrom(__DIR__ . '/Config/horizon.php', 'horizon');
+            $this->mergeConfigFrom(__DIR__ . '/../config/horizon.php', 'horizon');
         }
     }
 

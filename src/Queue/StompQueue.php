@@ -56,7 +56,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function size($queue = null)
     {
-        // TODO: Implement size() method.
+        // Stomp library doesn't have this functionality
         return 0;
     }
 
@@ -90,7 +90,7 @@ class StompQueue extends Queue implements QueueInterface
      * @param int $delay
      * @return array
      */
-    protected function makeDelayHeader($delay)
+    protected function makeDelayHeader(int $delay)
     {
         // TODO: remove ActiveMq hard coding
         return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
@@ -167,7 +167,7 @@ class StompQueue extends Queue implements QueueInterface
     {
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
             'id'  => $this->getRandomId(),
-            'raw' => $job,
+//            'raw' => $job,
         ]);
     }
 
