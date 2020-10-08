@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Stomp\StatefulStomp;
@@ -93,12 +94,32 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pushRaw($payload, $queue = null, array $options = [])
     {
-        $message = new Message($payload, $options);
+        $decoded = json_decode($payload, true);
+        $headers = $this->setHeaders($decoded, $options);
+
+        Arr::forget($decoded, '_headers');
+        $message = new Message(json_encode($decoded), $headers);
+
         $queue = $this->getWriteQueue();
 
         Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
         return $this->client->send($queue, $message);
+    }
+
+    protected function setHeaders(array $payload, array $options): array
+    {
+        if (!array_key_exists('_headers', $payload)) {
+            return $options;
+        }
+
+        // If left in the header, it will screw up the whole event redelivery.
+        // Also TODO: remove ActiveMq hard coding
+        Arr::forget($payload['_headers'], ['_AMQ_SCHED_DELIVERY', 'content-length']);
+
+        $headers = array_merge($options, $payload['_headers']);
+
+        return $headers;
     }
 
     /**
@@ -153,9 +174,19 @@ class StompQueue extends Queue implements QueueInterface
     protected function createPayloadArray($job, $queue, $data = '')
     {
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id'  => $this->getRandomId(),
-//            'raw' => $job,
+            'id' => $this->getRandomId(),
+            // 'raw' => $job,
         ]);
+    }
+
+    /**
+     * Get a random ID string.
+     *
+     * @return string
+     */
+    protected function getRandomId(): string
+    {
+        return Str::uuid();
     }
 
     /**
@@ -177,16 +208,6 @@ class StompQueue extends Queue implements QueueInterface
     public function getReadQueues(?string $queue)
     {
         return $queue ?: $this->readQueues;
-    }
-
-    /**
-     * Get a random ID string.
-     *
-     * @return string
-     */
-    protected function getRandomId(): string
-    {
-        return Str::uuid();
     }
 
     protected function subscribeToQueues(): void

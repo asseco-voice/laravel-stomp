@@ -100,6 +100,11 @@ make even bigger interval between two failed jobs.
 
 Job will be re-queued to the queue it came from.
 
+### Headers
+
+Due to the fact that Laravel doesn't save event headers to ``failed_jobs`` table, this package is circumventing this
+by storing headers as a part of the payload in ``_headers`` key. 
+
 ## Usage
 
 You can use library now like being native Laravel queue. 

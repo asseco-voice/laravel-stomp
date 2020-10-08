@@ -70,7 +70,12 @@ class StompJob extends Job implements JobContract
      */
     public function getRawBody()
     {
-        return $this->frame->body;
+        $rawBody = json_decode($this->frame->body, true);
+        $headers = $this->frame->getHeaders();
+
+        $payload = array_merge($rawBody, ['_headers' => $headers]);
+
+        return json_encode($payload, true);
     }
 
     /**
@@ -133,9 +138,9 @@ class StompJob extends Job implements JobContract
         $backoff = ConfigWrapper::get('auto_backoff') ? $this->getBackoff($attempts) : $delay;
         Arr::set($payload, 'backoff', $backoff);
 
-        $headers = $this->setHeaders($backoff);
+        $delayHeader = $this->stompQueue->makeDelayHeader($backoff);
 
-        $this->stompQueue->pushRaw(json_encode($payload), $this->queue, $headers);
+        $this->stompQueue->pushRaw(json_encode($payload), $this->queue, $delayHeader);
     }
 
     /**
@@ -188,10 +193,7 @@ class StompJob extends Job implements JobContract
 
     protected function handleOutsideJobs(array $payload): void
     {
-        Event::dispatch($this->getName(), [
-            'headers' => $this->frame->getHeaders(),
-            'body'    => $payload
-        ]);
+        Event::dispatch($this->getName(), $payload);
     }
 
     protected function getAttempts(array $payload): int
@@ -207,18 +209,5 @@ class StompJob extends Job implements JobContract
     protected function getBackoff(int $attempts): int
     {
         return pow($attempts, ConfigWrapper::get('backoff_multiplier'));
-    }
-
-    protected function setHeaders(int $backoff): array
-    {
-        $oldHeaders = $this->frame->getHeaders();
-
-        // If left in the header, it will screw up the whole event redelivery.
-        // Also TODO: remove ActiveMq hard coding
-        Arr::forget($oldHeaders, ['_AMQ_SCHED_DELIVERY', 'content-length']);
-
-        $makeDelayHeader = $this->stompQueue->makeDelayHeader($backoff);
-
-        return array_merge($makeDelayHeader, $oldHeaders);
     }
 }
