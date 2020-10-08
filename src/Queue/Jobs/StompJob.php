@@ -15,7 +15,7 @@ use Voice\Stomp\Queue\StompQueue;
 
 class StompJob extends Job implements JobContract
 {
-    protected const DEFAULT_TRIES = 3;
+    protected const DEFAULT_TRIES = 5;
 
     /**
      * The Stomp instance.
@@ -127,12 +127,15 @@ class StompJob extends Job implements JobContract
 
         $payload = $this->payload();
 
-        $attempts = Arr::get($payload, 'attempts', 1) + 1;
+        $attempts = $this->getAttempts($payload);
         Arr::set($payload, 'attempts', $attempts);
 
-        $payload = $this->calculateAutoBackoff($attempts, $payload);
+        $backoff = ConfigWrapper::get('auto_backoff') ? $this->getBackoff($attempts) : $delay;
+        Arr::set($payload, 'backoff', $backoff);
 
-        $this->stompQueue->recreate(json_encode($payload), $this->queue, $delay);
+        $headers = $this->setHeaders($backoff);
+
+        $this->stompQueue->pushRaw(json_encode($payload), $this->queue, $headers);
     }
 
     /**
@@ -191,20 +194,31 @@ class StompJob extends Job implements JobContract
         ]);
     }
 
+    protected function getAttempts(array $payload): int
+    {
+        return Arr::get($payload, 'attempts', 0) + 1;
+    }
+
     /**
      * @param int $attempts
      * @param array $payload
      * @return array
      */
-    protected function calculateAutoBackoff(int $attempts, array $payload): array
+    protected function getBackoff(int $attempts): int
     {
-        if (!ConfigWrapper::get('auto_backoff')) {
-            return $payload;
-        }
+        return pow($attempts, ConfigWrapper::get('backoff_multiplier'));
+    }
 
-        $backoff = pow($attempts, ConfigWrapper::get('backoff_multiplier'));
-        Arr::set($payload, 'backoff', $backoff);
+    protected function setHeaders(int $backoff): array
+    {
+        $oldHeaders = $this->frame->getHeaders();
 
-        return $payload;
+        // If left in the header, it will screw up the whole event redelivery.
+        // Also TODO: remove ActiveMq hard coding
+        Arr::forget($oldHeaders, ['_AMQ_SCHED_DELIVERY', 'content-length']);
+
+        $makeDelayHeader = $this->stompQueue->makeDelayHeader($backoff);
+
+        return array_merge($makeDelayHeader, $oldHeaders);
     }
 }

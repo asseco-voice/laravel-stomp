@@ -83,7 +83,7 @@ Event::listen('stomp.*', function ($event, $payload) {
 For the sake of simplicity and brevity ``StompJob`` class is defined in a way to utilize Laravel tries and
 backoff properties out of the box ([official documentation](https://laravel.com/docs/8.x/queues#dealing-with-failed-jobs)). 
 
-Upon failure, jobs will retry 3 times before being written to ``failed_jobs`` table.
+Upon failure, jobs will retry 5 times before being written to ``failed_jobs`` table.
 
 Each subsequent attempt will be tried in ``attempt^2`` seconds, meaning if it is a third attempt, it will retry in 9s after 
 the previous job failure. 
