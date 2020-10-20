@@ -18,7 +18,7 @@ return [
 
     /**
      * Calculate tries and backoff automatically without the need to specify it
-     * in the queue work command
+     * in the queue work command.
      */
     'auto_tries'         => env('STOMP_AUTO_TRIES', true),
     'auto_backoff'       => env('STOMP_AUTO_BACKOFF', true),

@@ -24,7 +24,7 @@ class StompJob extends Job implements JobContract
 
     /**
      * The Stomp frame instance.
-     * Message is just Frame with SEND command
+     * Message is just Frame with SEND command.
      */
     protected Frame $frame;
 
@@ -89,6 +89,7 @@ class StompJob extends Job implements JobContract
 
         if (array_key_exists('job', $payload)) {
             $this->handleLaravelJobs($payload);
+
             return;
         }
 
@@ -115,9 +116,9 @@ class StompJob extends Job implements JobContract
         parent::delete();
 
         Log::info('[STOMP] Deleting a message from queue: ' . print_r([
-                'queue'   => $this->queue,
-                'message' => $this->frame,
-            ], true));
+            'queue'   => $this->queue,
+            'message' => $this->frame,
+        ], true));
     }
 
     /**

@@ -21,7 +21,7 @@ use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 class StompQueue extends Queue implements QueueInterface
 {
     /**
-     * Queue name
+     * Queue name.
      */
     public string $readQueues;
 
@@ -32,13 +32,13 @@ class StompQueue extends Queue implements QueueInterface
     public string $writeQueue;
 
     /**
-     * List of queues already subscribed to. Preventing multiple same subscriptions
+     * List of queues already subscribed to. Preventing multiple same subscriptions.
      * @var array
      */
     protected array $subscribedTo = [];
 
     /**
-     * Stomp instance from stomp-php repo
+     * Stomp instance from stomp-php repo.
      */
     public StatefulStomp $client;
 
@@ -150,6 +150,7 @@ class StompQueue extends Queue implements QueueInterface
             $job = $this->client->read();
         } catch (Exception $e) {
             Log::error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
+
             return null;
         }
 
@@ -161,7 +162,6 @@ class StompQueue extends Queue implements QueueInterface
 
         return new StompJob($this->container, $this, $job, $this->getQueue($job));
     }
-
 
     /**
      * Create a payload array from the given job and data.

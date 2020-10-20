@@ -41,6 +41,7 @@ class StompQueue extends BaseStompQueue
     public function push($job, $data = '', $queue = null)
     {
         $this->lastPushed = $job;
+
         return parent::push($job, $data, $queue);
     }
 
