@@ -34,4 +34,6 @@ return [
      * attempt 4 - 16s
      */
     'backoff_multiplier' => env('STOMP_BACKOFF_MULTIPLIER', 2),
+
+    'enable_logs' => env('STOMP_LOGS', false) === true,
 ];

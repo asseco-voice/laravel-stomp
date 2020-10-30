@@ -2,8 +2,10 @@
 
 namespace Voice\Stomp;
 
+use Illuminate\Log\LogManager;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
+use Psr\Log\NullLogger;
 use Voice\Stomp\Horizon\StompQueue as HorizonStompQueue;
 use Voice\Stomp\Queue\Connectors\StompConnector;
 use Voice\Stomp\Queue\Stomp\ClientWrapper;
@@ -46,6 +48,12 @@ class StompServiceProvider extends ServiceProvider
 
         $queue->addConnector('stomp', function () {
             return new StompConnector($this->app['events']);
+        });
+
+        $logsEnabled = ConfigWrapper::get('enable_logs');
+
+        $this->app->singleton('stompLog', function ($app) use ($logsEnabled) {
+            return $logsEnabled ? new LogManager($app) : new NullLogger();
         });
     }
 }

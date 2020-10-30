@@ -118,6 +118,10 @@ Additionally, you can add a ``public $rawData`` property to an event and fill it
 with any payload. In case ``$rawData`` exists, it is the only set of data which will 
 be dispatched to broker. 
 
+## Logs
+
+Logs are turned off by default. You can include them by setting env key ``STOMP_LOGS=true``.
+
 ## Usage
 
 You can use library now like being native Laravel queue. 

@@ -9,8 +9,9 @@ use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
+use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
@@ -42,11 +43,15 @@ class StompQueue extends Queue implements QueueInterface
      */
     public StatefulStomp $client;
 
+    protected LoggerInterface $log;
+
     public function __construct(ClientWrapper $stompClient)
     {
         $this->readQueues = ConfigWrapper::get('read_queues');
         $this->writeQueue = ConfigWrapper::get('write_queue');
         $this->client = $stompClient->client;
+
+        $this->log = App::make('stompLog');
     }
 
     /**
@@ -102,7 +107,7 @@ class StompQueue extends Queue implements QueueInterface
 
         $queue = $this->getWriteQueue();
 
-        Log::info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
+        $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
 
         return $this->client->send($queue, $message);
     }
@@ -149,7 +154,7 @@ class StompQueue extends Queue implements QueueInterface
             $this->subscribeToQueues();
             $job = $this->client->read();
         } catch (Exception $e) {
-            Log::error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
+            $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
 
             return null;
         }
@@ -158,7 +163,7 @@ class StompQueue extends Queue implements QueueInterface
             return null;
         }
 
-        Log::info('[STOMP] Popping a job from queue: ' . print_r($job, true));
+        $this->log->info('[STOMP] Popping a job from queue: ' . print_r($job, true));
 
         return new StompJob($this->container, $this, $job, $this->getQueue($job));
     }

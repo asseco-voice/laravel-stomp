@@ -49,9 +49,10 @@ class StompQueue extends BaseStompQueue
      * Push a raw payload onto the queue.
      *
      * @param string $payload
-     * @param string $queue
+     * @param ?string $queue
      * @param array $options
      * @return mixed
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function pushRaw($payload, $queue = null, array $options = [])
     {
@@ -68,8 +69,9 @@ class StompQueue extends BaseStompQueue
      * @param \DateTimeInterface|\DateInterval|int $delay
      * @param string $job
      * @param mixed $data
-     * @param string $queue
+     * @param ?string $queue
      * @return mixed
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
@@ -85,6 +87,7 @@ class StompQueue extends BaseStompQueue
      *
      * @param string $queue
      * @return \Illuminate\Contracts\Queue\Job|null
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function pop($queue = null)
     {

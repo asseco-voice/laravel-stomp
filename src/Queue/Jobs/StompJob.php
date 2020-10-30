@@ -7,8 +7,8 @@ use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
 use Stomp\Transport\Frame;
 use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 use Voice\Stomp\Queue\StompQueue;
@@ -28,6 +28,8 @@ class StompJob extends Job implements JobContract
      */
     protected Frame $frame;
 
+    protected LoggerInterface $log;
+
     public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
         $this->container = $container;
@@ -35,6 +37,8 @@ class StompJob extends Job implements JobContract
         $this->frame = $frame;
         $this->connectionName = 'stomp';
         $this->queue = $queue;
+
+        $this->log = App::make('stompLog');
     }
 
     public function maxTries()
@@ -115,7 +119,7 @@ class StompJob extends Job implements JobContract
     {
         parent::delete();
 
-        Log::info('[STOMP] Deleting a message from queue: ' . print_r([
+        $this->log->info('[STOMP] Deleting a message from queue: ' . print_r([
             'queue'   => $this->queue,
             'message' => $this->frame,
         ], true));
