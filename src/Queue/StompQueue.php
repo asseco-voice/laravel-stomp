@@ -173,9 +173,12 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function createPayloadArray($job, $queue, $data = '')
     {
+        if (property_exists($job, 'event') && $job->event->sendRawData) {
+            return property_exists($job, 'rawData') ? [$job->event->rawData] : [$job->event];
+        }
+
         return array_merge(parent::createPayloadArray($job, $queue, $data), [
             'id' => $this->getRandomId(),
-            // 'raw' => $job,
         ]);
     }
 
