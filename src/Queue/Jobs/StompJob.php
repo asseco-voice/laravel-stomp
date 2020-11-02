@@ -9,6 +9,7 @@ use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Event;
+use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
 use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 use Voice\Stomp\Queue\StompQueue;

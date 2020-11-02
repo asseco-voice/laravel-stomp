@@ -122,9 +122,7 @@ class StompQueue extends Queue implements QueueInterface
         // Also TODO: remove ActiveMq hard coding
         Arr::forget($payload['_headers'], ['_AMQ_SCHED_DELIVERY', 'content-length']);
 
-        $headers = array_merge($options, $payload['_headers']);
-
-        return $headers;
+        return array_merge($options, $payload['_headers']);
     }
 
     /**
@@ -178,7 +176,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function createPayloadArray($job, $queue, $data = '')
     {
-        if (property_exists($job, 'event') && $job->event->sendRawData) {
+        if ($this->shouldSendRawData($job)) {
             return property_exists($job, 'rawData') ? [$job->event->rawData] : [$job->event];
         }
 
@@ -250,5 +248,10 @@ class StompQueue extends Queue implements QueueInterface
     public function getQueue(Frame $frame)
     {
         return $this->client->getSubscriptions()->getSubscription($frame)->getDestination();
+    }
+
+    protected function shouldSendRawData(string $job): bool
+    {
+        return property_exists($job, 'event') && $job->event->sendRawData;
     }
 }
