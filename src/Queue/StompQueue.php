@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\Queue as QueueInterface;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
@@ -80,16 +79,6 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param int $delay
-     * @return array
-     */
-    public function makeDelayHeader(int $delay)
-    {
-        // TODO: remove ActiveMq hard coding
-        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
-    }
-
-    /**
      * Push a raw payload onto the queue.
      *
      * @param string $payload
@@ -123,6 +112,12 @@ class StompQueue extends Queue implements QueueInterface
         Arr::forget($payload['_headers'], ['_AMQ_SCHED_DELIVERY', 'content-length']);
 
         return array_merge($options, $payload['_headers']);
+    }
+
+    public function makeDelayHeader(int $delay): array
+    {
+        // TODO: remove ActiveMq hard coding
+        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
     }
 
     /**
@@ -180,19 +175,7 @@ class StompQueue extends Queue implements QueueInterface
             return property_exists($job, 'rawData') ? [$job->event->rawData] : [$job->event];
         }
 
-        return array_merge(parent::createPayloadArray($job, $queue, $data), [
-            'id' => $this->getRandomId(),
-        ]);
-    }
-
-    /**
-     * Get a random ID string.
-     *
-     * @return string
-     */
-    protected function getRandomId(): string
-    {
-        return Str::uuid();
+        return parent::createPayloadArray($job, $queue, $data);
     }
 
     /**
