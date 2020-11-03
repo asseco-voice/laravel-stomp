@@ -2,11 +2,15 @@
 
 namespace Voice\Stomp\Queue;
 
+use Closure;
 use DateInterval;
 use DateTimeInterface;
 use Exception;
+use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\Queue as QueueInterface;
+use Illuminate\Queue\CallQueuedClosure;
+use Illuminate\Queue\InvalidPayloadException;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
@@ -14,12 +18,16 @@ use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
+use Voice\Stomp\Queue\Contracts\HasHeaders;
+use Voice\Stomp\Queue\Contracts\HasRawData;
 use Voice\Stomp\Queue\Jobs\StompJob;
 use Voice\Stomp\Queue\Stomp\ClientWrapper;
 use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 
 class StompQueue extends Queue implements QueueInterface
 {
+    public const HEADERS_KEY = '_headers';
+
     /**
      * Queue name.
      */
@@ -75,49 +83,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function push($job, $data = '', $queue = null)
     {
-        return $this->pushRaw($this->createPayload($job, $queue, $data), $queue, []);
-    }
-
-    /**
-     * Push a raw payload onto the queue.
-     *
-     * @param string $payload
-     * @param string|null $queue
-     * @param array $options
-     * @return mixed
-     */
-    public function pushRaw($payload, $queue = null, array $options = [])
-    {
-        $decoded = json_decode($payload, true);
-        $headers = $this->setHeaders($decoded, $options);
-
-        Arr::forget($decoded, '_headers');
-        $message = new Message(json_encode($decoded), $headers);
-
-        $queue = $this->getWriteQueue();
-
-        $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r(['payload' => $message, 'queue' => $queue], true));
-
-        return $this->client->send($queue, $message);
-    }
-
-    protected function setHeaders(array $payload, array $options): array
-    {
-        if (!array_key_exists('_headers', $payload)) {
-            return $options;
-        }
-
-        // If left in the header, it will screw up the whole event redelivery.
-        // Also TODO: remove ActiveMq hard coding
-        Arr::forget($payload['_headers'], ['_AMQ_SCHED_DELIVERY', 'content-length']);
-
-        return array_merge($options, $payload['_headers']);
-    }
-
-    public function makeDelayHeader(int $delay): array
-    {
-        // TODO: remove ActiveMq hard coding
-        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
+        return $this->pushRaw($this->createPayload($job, $queue, $data), $queue);
     }
 
     /**
@@ -135,6 +101,118 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * Push a raw payload onto the queue.
+     *
+     * @param string $payload
+     * @param string|null $queue
+     * @param array $options
+     * @return mixed
+     */
+    public function pushRaw($payload, $queue = null, array $options = [])
+    {
+        if (!$payload instanceof Message) {
+            $payload = $this->wrapStompMessage($payload);
+        }
+
+        $writeQueue = $queue ?: $this->getWriteQueue();
+
+        /**
+         * @var $payload Message
+         */
+        $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueue
+            ], true));
+
+        return $this->client->send($writeQueue, $payload);
+    }
+
+    protected function wrapStompMessage(string $payload): Message
+    {
+        $decoded = json_decode($payload, true);
+        $body = Arr::except($decoded, self::HEADERS_KEY);
+        $headers = Arr::get($decoded, self::HEADERS_KEY, []);
+        $headers = $this->forgetHeadersForRedelivery($headers);
+
+        return new Message(json_encode($body), $headers);
+    }
+
+    /**
+     * Overridden to prevent double json encoding/decoding
+     * Create a payload string from the given job and data.
+     *
+     * @param $job
+     * @param $queue
+     * @param string $data
+     * @return Message
+     */
+    protected function createPayload($job, $queue, $data = '')
+    {
+        if ($job instanceof Closure) {
+            $job = CallQueuedClosure::create($job);
+        }
+
+        $payload = $this->createPayloadArray($job, $queue, $data);
+        $headers = $this->getHeaders($job);
+        $headers = $this->forgetHeadersForRedelivery($headers);
+
+        $message = new Message(json_encode($payload), $headers);
+
+        if (JSON_ERROR_NONE !== json_last_error()) {
+            throw new InvalidPayloadException(
+                'Unable to JSON encode payload. Error code: ' . json_last_error()
+            );
+        }
+
+        return $message;
+    }
+
+    /**
+     * Overridden to support raw data
+     * Create a payload array from the given job and data.
+     *
+     * @param object|string $job
+     * @param string $queue
+     * @param string $data
+     * @return array
+     */
+    protected function createPayloadArray($job, $queue, $data = '')
+    {
+        if ($this->hasEvent($job) && $job->event instanceof HasRawData) {
+            return $job->event->getRawData();
+        }
+
+        return parent::createPayloadArray($job, $queue, $data);
+    }
+
+    protected function getHeaders($job)
+    {
+        if ($this->hasEvent($job) && $job->event instanceof HasHeaders) {
+            return $job->event->getHeaders();
+        }
+
+        // TODO: headers on listeners
+//        if ($job instanceof CallQueuedListener ) {
+//            return $job->data[0]->getHeaders();
+//        }
+
+        return [];
+    }
+
+    protected function hasEvent($job): bool
+    {
+        return $job instanceof BroadcastEvent && property_exists($job, 'event');
+    }
+
+    protected function getWriteQueue()
+    {
+        $queues = $this->parseDelimitedQueues($this->writeQueue);
+
+        return $queues[0];
+    }
+
+    /**
      * Pop the next job off of the queue.
      *
      * @param string|null $queue
@@ -145,58 +223,20 @@ class StompQueue extends Queue implements QueueInterface
         try {
             $this->client->getClient()->getConnection()->sendAlive();
             $this->subscribeToQueues();
-            $job = $this->client->read();
+            $frame = $this->client->read();
         } catch (Exception $e) {
             $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
 
             return null;
         }
 
-        if (is_null($job) || !($job instanceof Frame)) {
+        if (is_null($frame) || !($frame instanceof Frame)) {
             return null;
         }
 
-        $this->log->info('[STOMP] Popping a job from queue: ' . print_r($job, true));
+        $this->log->info('[STOMP] Popping a job (frame) from queue: ' . print_r($frame, true));
 
-        return new StompJob($this->container, $this, $job, $this->getQueue($job));
-    }
-
-    /**
-     * Create a payload array from the given job and data.
-     *
-     * @param object|string $job
-     * @param string $queue
-     * @param string $data
-     * @return array
-     */
-    protected function createPayloadArray($job, $queue, $data = '')
-    {
-        if ($this->shouldSendRawData($job)) {
-            return property_exists($job, 'rawData') ? [$job->event->rawData] : [$job->event];
-        }
-
-        return parent::createPayloadArray($job, $queue, $data);
-    }
-
-    /**
-     * Close the connection.
-     *
-     * @return void
-     */
-    public function close(): void
-    {
-        $this->client->getClient()->disconnect();
-    }
-
-    /**
-     * Get the queue or return the default.
-     *
-     * @param string|null $queue
-     * @return string
-     */
-    public function getReadQueues(?string $queue)
-    {
-        return $queue ?: $this->readQueues;
+        return new StompJob($this->container, $this, $frame, $this->getQueueFromFrame($frame));
     }
 
     protected function subscribeToQueues(): void
@@ -221,20 +261,50 @@ class StompQueue extends Queue implements QueueInterface
         return explode(';', $queue);
     }
 
-    protected function getWriteQueue()
+    /**
+     * Get the queue or return the default.
+     *
+     * @param string|null $queue
+     * @return string
+     */
+    protected function getReadQueues(?string $queue): string
     {
-        $queues = $this->parseDelimitedQueues($this->writeQueue);
-
-        return $queues[0];
+        return $queue ?: $this->readQueues;
     }
 
-    public function getQueue(Frame $frame)
+    protected function getQueueFromFrame(Frame $frame): string
     {
         return $this->client->getSubscriptions()->getSubscription($frame)->getDestination();
     }
 
-    protected function shouldSendRawData(string $job): bool
+    /**
+     * Close the connection.
+     *
+     * @return void
+     */
+    public function close(): void
     {
-        return property_exists($job, 'event') && $job->event->sendRawData;
+        $this->client->getClient()->disconnect();
+    }
+
+    public function makeDelayHeader(int $delay): array
+    {
+        // TODO: remove ActiveMq hard coding
+        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
+    }
+
+    /**
+     * If these values are left in the header, it will screw up the whole event redelivery
+     * so we need to remove them before sending back to queue.
+     *
+     * @param array $headers
+     * @return array
+     */
+    public function forgetHeadersForRedelivery(array $headers): array
+    {
+        // TODO: remove ActiveMq hard coding
+        Arr::forget($headers, ['_AMQ_SCHED_DELIVERY', 'content-length']);
+
+        return $headers;
     }
 }

@@ -105,18 +105,16 @@ Job will be re-queued to the queue it came from.
 ### Headers
 
 Due to the fact that Laravel doesn't save event headers to ``failed_jobs`` table, this package is circumventing this
-by storing headers as a part of the payload in ``_headers`` key. 
+by storing headers as a part of the payload in ``_headers`` key. This is all done automatically behind the scenes
+so no interaction is needed with it. 
+
+If you want to append additional headers to your events, you can do so by implementing `HasHeaders` interface.
 
 ## Raw data
 
-If you wish to send event data in its raw format without Laravel wrappers, be sure to set 
-the ``$sendRawData`` property on the event you're pushing to `true`.
-
-This will send only event data to broker. 
-
-Additionally, you can add a ``public $rawData`` property to an event and fill it out 
-with any payload. In case ``$rawData`` exists, it is the only set of data which will 
-be dispatched to broker. 
+In case you need your service to communicate with external non-Laravel services it is possible to circumvent 
+Laravel event wrapping by implementing ``HasRawData`` interface. This will enable you to provide a custom 
+payload to the broker.
 
 ## Logs
 

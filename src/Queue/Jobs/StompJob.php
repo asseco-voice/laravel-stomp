@@ -9,8 +9,10 @@ use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
+use Stomp\Transport\Message;
 use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 use Voice\Stomp\Queue\StompQueue;
 
@@ -18,18 +20,11 @@ class StompJob extends Job implements JobContract
 {
     protected const DEFAULT_TRIES = 5;
 
-    /**
-     * The Stomp instance.
-     */
-    private StompQueue $stompQueue;
-
-    /**
-     * The Stomp frame instance.
-     * Message is just Frame with SEND command.
-     */
+    protected StompQueue $stompQueue;
     protected Frame $frame;
-
     protected LoggerInterface $log;
+
+    protected array $payload;
 
     public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
@@ -40,8 +35,36 @@ class StompJob extends Job implements JobContract
         $this->queue = $queue;
 
         $this->log = App::make('stompLog');
+
+        $this->payload = $this->payload();
     }
 
+    /**
+     * Get the raw body string for the job.
+     *
+     * @return string
+     */
+    public function getRawBody()
+    {
+        // Even though payload() decodes it again, this must be left as is because
+        // job failure calls this method and we need headers in DB table as well.
+        $body = json_decode($this->frame->getBody(), true);
+        $headers = [$this->stompQueue::HEADERS_KEY => $this->headers()];
+
+        return json_encode(array_merge($body, $headers));
+    }
+
+    public function headers(): array
+    {
+        return $this->frame->getHeaders();
+    }
+
+    /**
+     * Overridden for configurable automatic max tries.
+     * Get the number of times to attempt a job.
+     *
+     * @return int|null
+     */
     public function maxTries()
     {
         if (ConfigWrapper::get('auto_tries')) {
@@ -52,35 +75,14 @@ class StompJob extends Job implements JobContract
     }
 
     /**
+     * Overridden to include 2 fallbacks to standard Laravel jobs: one for external job ID's, other if that fails as well.
      * Get the job identifier.
      *
      * @return string
      */
     public function getJobId()
     {
-        $jobId = Arr::get($this->payload(), 'id', null);
-
-        // Assemble JobId for non-Laravel events
-        if (!$jobId) {
-            $jobId = Arr::get($this->frame->getHeaders(), 'message-id', null);
-        }
-
-        return $jobId;
-    }
-
-    /**
-     * Get the raw body string for the job.
-     *
-     * @return string
-     */
-    public function getRawBody()
-    {
-        $rawBody = json_decode($this->frame->body, true);
-        $headers = $this->frame->getHeaders();
-
-        $payload = array_merge($rawBody, ['_headers' => $headers]);
-
-        return json_encode($payload, true);
+        return Arr::get($this->payload, 'uuid') ?: Arr::get($this->payload, $this->stompQueue::HEADERS_KEY . '.message-id') ?: Str::uuid();
     }
 
     /**
@@ -90,25 +92,50 @@ class StompJob extends Job implements JobContract
      */
     public function fire()
     {
-        $payload = $this->payload();
+        $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
+    }
 
-        if (array_key_exists('job', $payload)) {
-            $this->handleLaravelJobs($payload);
+    protected function isNativeLaravelJob(): bool
+    {
+        return array_key_exists('job', $this->payload);
+    }
 
-            return;
-        }
+    protected function fireLaravelJob(): void
+    {
+        [$class, $method] = JobName::parse($this->payload['job']);
+        ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data']);
+    }
 
-        $this->handleOutsideJobs($payload);
+    protected function fireExternalJob(): void
+    {
+        Event::dispatch($this->getName(), $this->payload);
     }
 
     /**
-     * Get the number of times the job has been attempted.
+     * Get the name of the queued job class. Fallback if it is an external event.
      *
-     * @return int
+     * @return string
      */
-    public function attempts()
+    public function getName()
     {
-        return Arr::get($this->payload(), 'attempts', 1);
+        return Arr::get($this->payload, 'job') ?: $this->getExternalEventName();
+    }
+
+    protected function getExternalEventName(): string
+    {
+        $jobName = 'event';
+        $subscribedTo = $this->getSubscriptionName();
+
+        if ($subscribedTo) {
+            $jobName = 'stomp.' . str_replace('::', '.', $subscribedTo);
+        }
+
+        return $jobName;
+    }
+
+    protected function getSubscriptionName(): string
+    {
+        return $this->stompQueue->client->getSubscriptions()->getSubscription($this->frame)->getDestination();
     }
 
     /**
@@ -118,12 +145,12 @@ class StompJob extends Job implements JobContract
      */
     public function delete()
     {
-        parent::delete();
-
         $this->log->info('[STOMP] Deleting a message from queue: ' . print_r([
-            'queue'   => $this->queue,
-            'message' => $this->frame,
-        ], true));
+                'queue'   => $this->queue,
+                'message' => $this->frame,
+            ], true));
+
+        parent::delete();
     }
 
     /**
@@ -136,39 +163,39 @@ class StompJob extends Job implements JobContract
     {
         parent::release($delay);
 
-        $payload = $this->payload();
+        $payload = $this->createStompPayload($delay);
 
-        $attempts = $this->getAttempts($payload);
-        Arr::set($payload, 'attempts', $attempts);
+        $this->stompQueue->pushRaw($payload, $this->queue, []);
+    }
+
+    protected function createStompPayload(int $delay): Message
+    {
+        $attempts = $this->attempts() + 1;
+        Arr::set($this->payload, 'attempts', $attempts);
 
         $backoff = ConfigWrapper::get('auto_backoff') ? $this->getBackoff($attempts) : $delay;
-        Arr::set($payload, 'backoff', $backoff);
+        Arr::set($this->payload, 'backoff', $backoff);
 
         $delayHeader = $this->stompQueue->makeDelayHeader($backoff);
+        $headers = array_merge($this->headers(), $delayHeader);
+        $headers = $this->stompQueue->forgetHeadersForRedelivery($headers);
 
-        $this->stompQueue->pushRaw(json_encode($payload), $this->queue, $delayHeader);
+        return new Message(json_encode($this->payload), $headers);
     }
 
     /**
-     * Get the name of the queued job class.
+     * Get the number of times the job has been attempted.
      *
-     * @return string
+     * @return int
      */
-    public function getName()
+    public function attempts()
     {
-        $jobName = Arr::get($this->payload(), 'job');
+        return Arr::get($this->payload, 'attempts', 0);
+    }
 
-        // Assemble the name for non-Laravel events
-        if (!$jobName) {
-            $jobName = 'event';
-            $subscribedTo = $this->stompQueue->client->getSubscriptions()->getSubscription($this->frame)->getDestination();
-
-            if ($subscribedTo) {
-                $jobName = 'stomp.' . str_replace('::', '.', $subscribedTo);
-            }
-        }
-
-        return $jobName;
+    protected function getBackoff(int $attempts): int
+    {
+        return pow($attempts, ConfigWrapper::get('backoff_multiplier'));
     }
 
     /**
@@ -179,41 +206,15 @@ class StompJob extends Job implements JobContract
      */
     protected function failed($e)
     {
-        $payload = $this->payload();
-
-        // Handle plain Laravel jobs
-        if ($payload && array_key_exists('job', $payload)) {
-            [$class, $method] = JobName::parse($payload['job']);
-
-            if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-                $this->instance->failed($payload['data'], $e, $payload['id']);
-            }
+        // External events don't have failed method to call.
+        if (!$this->payload || !$this->isNativeLaravelJob()) {
+            return;
         }
-    }
 
-    protected function handleLaravelJobs(array $payload): void
-    {
-        [$class, $method] = JobName::parse($payload['job']);
-        ($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
-    }
+        [$class, $method] = JobName::parse($this->payload['job']);
 
-    protected function handleOutsideJobs(array $payload): void
-    {
-        Event::dispatch($this->getName(), $payload);
-    }
-
-    protected function getAttempts(array $payload): int
-    {
-        return Arr::get($payload, 'attempts', 0) + 1;
-    }
-
-    /**
-     * @param int $attempts
-     * @param array $payload
-     * @return array
-     */
-    protected function getBackoff(int $attempts): int
-    {
-        return pow($attempts, ConfigWrapper::get('backoff_multiplier'));
+        if (method_exists($this->instance = $this->resolve($class), 'failed')) {
+            $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
+        }
     }
 }
