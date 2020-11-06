@@ -183,6 +183,10 @@ class StompQueue extends Queue implements QueueInterface
             return $job->event->getRawData();
         }
 
+        if ($job instanceof HasRawData) {
+            return $job->getRawData();
+        }
+
         return parent::createPayloadArray($job, $queue, $data);
     }
 
@@ -192,10 +196,9 @@ class StompQueue extends Queue implements QueueInterface
             return $job->event->getHeaders();
         }
 
-        // TODO: headers on listeners
-//        if ($job instanceof CallQueuedListener ) {
-//            return $job->data[0]->getHeaders();
-//        }
+        if ($job instanceof HasHeaders) {
+            return $job->getHeaders();
+        }
 
         return [];
     }
