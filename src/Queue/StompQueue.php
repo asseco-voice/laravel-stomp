@@ -196,7 +196,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string)Str::uuid();
+            $payload['uuid'] = (string) Str::uuid();
         }
 
         return $payload;
