@@ -14,6 +14,7 @@ use Illuminate\Queue\InvalidPayloadException;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
@@ -132,6 +133,7 @@ class StompQueue extends Queue implements QueueInterface
     {
         $decoded = json_decode($payload, true);
         $body = Arr::except($decoded, self::HEADERS_KEY);
+        $body = $this->addMissingUuid($body);
         $headers = Arr::get($decoded, self::HEADERS_KEY, []);
         $headers = $this->forgetHeadersForRedelivery($headers);
 
@@ -154,6 +156,7 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         $payload = $this->createPayloadArray($job, $queue, $data);
+        $payload = $this->addMissingUuid($payload);
         $headers = $this->getHeaders($job);
         $headers = $this->forgetHeadersForRedelivery($headers);
 
@@ -188,6 +191,15 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         return parent::createPayloadArray($job, $queue, $data);
+    }
+
+    protected function addMissingUuid(array $payload): array
+    {
+        if (!Arr::has($payload, 'uuid')) {
+            $payload['uuid'] = (string)Str::uuid();
+        }
+
+        return $payload;
     }
 
     protected function getHeaders($job)
