@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Str;
+
 return [
 
     'driver'             => 'stomp',
@@ -34,6 +36,14 @@ return [
      * attempt 4 - 16s
      */
     'backoff_multiplier' => env('STOMP_BACKOFF_MULTIPLIER', 2),
+
+    /**
+     * What will be appended as the queue if only address/topic is defined.
+     * This is done to ensure that service doesn't connect to a broker with
+     * hash as queue name. In case of multiple services connecting in such
+     * a way, it becomes unclear which queue is from which service.
+     */
+    'default_queue' => strtolower(Str::snake(env('APP_NAME', 'localhost'))),
 
     'enable_logs' => env('STOMP_LOGS', false) === true,
 ];

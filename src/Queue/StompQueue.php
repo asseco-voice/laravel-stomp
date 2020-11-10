@@ -27,6 +27,7 @@ use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 
 class StompQueue extends Queue implements QueueInterface
 {
+    public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
 
     /**
@@ -55,11 +56,30 @@ class StompQueue extends Queue implements QueueInterface
 
     public function __construct(ClientWrapper $stompClient)
     {
-        $this->readQueues = ConfigWrapper::get('read_queues');
+        $this->readQueues = $this->appendQueue(ConfigWrapper::get('read_queues'));
         $this->writeQueue = ConfigWrapper::get('write_queue');
         $this->client = $stompClient->client;
 
         $this->log = App::make('stompLog');
+    }
+
+    /**
+     * Append queue name to topic/address to avoid random hashes in broker.
+     *
+     * @param string $queues
+     * @return string
+     */
+    protected function appendQueue(string $queues): string
+    {
+        $default = ConfigWrapper::get('default_queue');
+
+        return implode(';', array_map(function ($queue) use ($default) {
+            if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
+                return $queue . self::AMQ_QUEUE_SEPARATOR . $default . "_" . Str::uuid();
+            }
+
+            return $queue;
+        }, $this->parseDelimitedQueues($queues)));
     }
 
     /**
@@ -121,10 +141,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueue,
-        ], true));
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueue,
+            ], true));
 
         return $this->client->send($writeQueue, $payload);
     }
