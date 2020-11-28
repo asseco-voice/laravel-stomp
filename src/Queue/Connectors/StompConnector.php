@@ -1,16 +1,16 @@
 <?php
 
-namespace Voice\Stomp\Queue\Connectors;
+namespace Asseco\Stomp\Queue\Connectors;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\App;
-use Voice\Stomp\Horizon\Listeners\StompFailedEvent;
-use Voice\Stomp\Horizon\StompQueue as HorizonStompQueue;
-use Voice\Stomp\Queue\Stomp\ConfigWrapper;
-use Voice\Stomp\Queue\StompQueue;
+use Asseco\Stomp\Horizon\Listeners\StompFailedEvent;
+use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
+use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\StompQueue;
 
 class StompConnector implements ConnectorInterface
 {

@@ -1,12 +1,12 @@
 <?php
 
-namespace Voice\Stomp\Horizon\Listeners;
+namespace Asseco\Stomp\Horizon\Listeners;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Events\JobFailed as LaravelJobFailed;
 use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobFailed;
-use Voice\Stomp\Queue\Jobs\StompJob;
+use Asseco\Stomp\Queue\Jobs\StompJob;
 
 class StompFailedEvent
 {

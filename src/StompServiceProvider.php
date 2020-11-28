@@ -1,17 +1,17 @@
 <?php
 
-namespace Voice\Stomp;
+namespace Asseco\Stomp;
 
 use Illuminate\Log\LogManager;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\NullLogger;
-use Voice\Stomp\Horizon\StompQueue as HorizonStompQueue;
-use Voice\Stomp\Queue\Connectors\StompConnector;
-use Voice\Stomp\Queue\Stomp\ClientWrapper;
-use Voice\Stomp\Queue\Stomp\ConfigWrapper;
-use Voice\Stomp\Queue\Stomp\ConnectionWrapper;
-use Voice\Stomp\Queue\StompQueue;
+use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
+use Asseco\Stomp\Queue\Connectors\StompConnector;
+use Asseco\Stomp\Queue\Stomp\ClientWrapper;
+use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
+use Asseco\Stomp\Queue\StompQueue;
 
 class StompServiceProvider extends ServiceProvider
 {
