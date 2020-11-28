@@ -2,11 +2,11 @@
 
 namespace Asseco\Stomp\Horizon\Listeners;
 
+use Asseco\Stomp\Queue\Jobs\StompJob;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Events\JobFailed as LaravelJobFailed;
 use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Events\JobFailed;
-use Asseco\Stomp\Queue\Jobs\StompJob;
 
 class StompFailedEvent
 {
