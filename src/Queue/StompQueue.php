@@ -2,6 +2,11 @@
 
 namespace Asseco\Stomp\Queue;
 
+use Asseco\Stomp\Queue\Contracts\HasHeaders;
+use Asseco\Stomp\Queue\Contracts\HasRawData;
+use Asseco\Stomp\Queue\Jobs\StompJob;
+use Asseco\Stomp\Queue\Stomp\ClientWrapper;
+use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -19,11 +24,6 @@ use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
-use Asseco\Stomp\Queue\Contracts\HasHeaders;
-use Asseco\Stomp\Queue\Contracts\HasRawData;
-use Asseco\Stomp\Queue\Jobs\StompJob;
-use Asseco\Stomp\Queue\Stomp\ClientWrapper;
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
 
 class StompQueue extends Queue implements QueueInterface
 {
@@ -75,7 +75,7 @@ class StompQueue extends Queue implements QueueInterface
 
         return implode(';', array_map(function ($queue) use ($default) {
             if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
-                return $queue . self::AMQ_QUEUE_SEPARATOR . $default . "_" . Str::uuid();
+                return $queue . self::AMQ_QUEUE_SEPARATOR . $default . '_' . Str::uuid();
             }
 
             return $queue;
@@ -141,10 +141,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-                'body'    => $payload->getBody(),
-                'headers' => $payload->getHeaders(),
-                'queue'   => $writeQueue,
-            ], true));
+            'body'    => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue'   => $writeQueue,
+        ], true));
 
         return $this->client->send($writeQueue, $payload);
     }

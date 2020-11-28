@@ -2,16 +2,16 @@
 
 namespace Asseco\Stomp;
 
-use Illuminate\Log\LogManager;
-use Illuminate\Queue\QueueManager;
-use Illuminate\Support\ServiceProvider;
-use Psr\Log\NullLogger;
 use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
 use Asseco\Stomp\Queue\Connectors\StompConnector;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
 use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Asseco\Stomp\Queue\StompQueue;
+use Illuminate\Log\LogManager;
+use Illuminate\Queue\QueueManager;
+use Illuminate\Support\ServiceProvider;
+use Psr\Log\NullLogger;
 
 class StompServiceProvider extends ServiceProvider
 {
