@@ -1,7 +1,9 @@
 <?php
 
-namespace Voice\Stomp\Queue\Jobs;
+namespace Asseco\Stomp\Queue\Jobs;
 
+use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\StompQueue;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
@@ -13,8 +15,6 @@ use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
-use Voice\Stomp\Queue\Stomp\ConfigWrapper;
-use Voice\Stomp\Queue\StompQueue;
 
 class StompJob extends Job implements JobContract
 {

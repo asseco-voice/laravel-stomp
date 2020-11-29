@@ -23,13 +23,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Voice\\Stomp\\": "src/"
+            "Asseco\\Stomp\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Voice\\Stomp\\StompServiceProvider"
+                "Asseco\\Stomp\\StompServiceProvider"
             ]
         }
     }

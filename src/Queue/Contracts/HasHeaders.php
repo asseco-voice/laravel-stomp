@@ -1,6 +1,6 @@
 <?php
 
-namespace Voice\Stomp\Queue\Contracts;
+namespace Asseco\Stomp\Queue\Contracts;
 
 interface HasHeaders
 {

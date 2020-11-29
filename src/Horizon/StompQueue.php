@@ -1,14 +1,14 @@
 <?php
 
-namespace Voice\Stomp\Horizon;
+namespace Asseco\Stomp\Horizon;
 
+use Asseco\Stomp\Queue\Jobs\StompJob;
+use Asseco\Stomp\Queue\StompQueue as BaseStompQueue;
 use Illuminate\Contracts\Events\Dispatcher;
 use Laravel\Horizon\Events\JobDeleted;
 use Laravel\Horizon\Events\JobPushed;
 use Laravel\Horizon\Events\JobReserved;
 use Laravel\Horizon\JobPayload;
-use Voice\Stomp\Queue\Jobs\StompJob;
-use Voice\Stomp\Queue\StompQueue as BaseStompQueue;
 
 class StompQueue extends BaseStompQueue
 {

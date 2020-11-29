@@ -1,6 +1,6 @@
 <?php
 
-namespace Voice\Stomp\Queue\Stomp;
+namespace Asseco\Stomp\Queue\Stomp;
 
 use Illuminate\Support\Facades\Config;
 

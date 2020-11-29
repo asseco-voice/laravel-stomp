@@ -1,7 +1,12 @@
 <?php
 
-namespace Voice\Stomp\Queue;
+namespace Asseco\Stomp\Queue;
 
+use Asseco\Stomp\Queue\Contracts\HasHeaders;
+use Asseco\Stomp\Queue\Contracts\HasRawData;
+use Asseco\Stomp\Queue\Jobs\StompJob;
+use Asseco\Stomp\Queue\Stomp\ClientWrapper;
+use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -19,11 +24,6 @@ use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
-use Voice\Stomp\Queue\Contracts\HasHeaders;
-use Voice\Stomp\Queue\Contracts\HasRawData;
-use Voice\Stomp\Queue\Jobs\StompJob;
-use Voice\Stomp\Queue\Stomp\ClientWrapper;
-use Voice\Stomp\Queue\Stomp\ConfigWrapper;
 
 class StompQueue extends Queue implements QueueInterface
 {
