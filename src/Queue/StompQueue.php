@@ -140,10 +140,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-                'body'    => $payload->getBody(),
-                'headers' => $payload->getHeaders(),
-                'queue'   => $writeQueue,
-            ], true));
+            'body'    => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue'   => $writeQueue,
+        ], true));
 
         return $this->client->send($writeQueue, $payload);
     }
@@ -215,7 +215,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string)Str::uuid();
+            $payload['uuid'] = (string) Str::uuid();
         }
 
         return $payload;
