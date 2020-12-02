@@ -52,9 +52,9 @@ class StompConnector implements ConnectorInterface
     {
         switch (ConfigWrapper::get('worker')) {
             case 'horizon':
-                return app()->make(HorizonStompQueue::class);
+                return app(HorizonStompQueue::class);
             default:
-                return app()->make(StompQueue::class);
+                return app(StompQueue::class);
         }
     }
 }

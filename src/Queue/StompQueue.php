@@ -59,7 +59,7 @@ class StompQueue extends Queue implements QueueInterface
         $this->writeQueue = ConfigWrapper::get('write_queue');
         $this->client = $stompClient->client;
 
-        $this->log = app()->make('stompLog');
+        $this->log = app('stompLog');
     }
 
     /**

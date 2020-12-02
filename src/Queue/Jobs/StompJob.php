@@ -33,7 +33,7 @@ class StompJob extends Job implements JobContract
         $this->connectionName = 'stomp';
         $this->queue = $queue;
 
-        $this->log = app()->make('stompLog');
+        $this->log = app('stompLog');
 
         $this->payload = $this->payload();
     }
