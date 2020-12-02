@@ -36,12 +36,12 @@ class StompServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->app->singleton(ConfigWrapper::class);
-        $this->app->singleton(ConnectionWrapper::class);
-        $this->app->singleton(ClientWrapper::class);
+        app()->singleton(ConfigWrapper::class);
+        app()->singleton(ConnectionWrapper::class);
+        app()->singleton(ClientWrapper::class);
 
-        $this->app->singleton(StompQueue::class);
-        $this->app->singleton(HorizonStompQueue::class);
+        app()->singleton(StompQueue::class);
+        app()->singleton(HorizonStompQueue::class);
 
         /** @var QueueManager $queue */
         $queue = $this->app['queue'];
@@ -52,7 +52,7 @@ class StompServiceProvider extends ServiceProvider
 
         $logsEnabled = ConfigWrapper::get('enable_logs');
 
-        $this->app->singleton('stompLog', function ($app) use ($logsEnabled) {
+        app()->singleton('stompLog', function ($app) use ($logsEnabled) {
             return $logsEnabled ? new LogManager($app) : new NullLogger();
         });
     }

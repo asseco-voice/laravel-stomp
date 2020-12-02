@@ -18,7 +18,6 @@ use Illuminate\Queue\CallQueuedClosure;
 use Illuminate\Queue\InvalidPayloadException;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
@@ -60,7 +59,7 @@ class StompQueue extends Queue implements QueueInterface
         $this->writeQueue = ConfigWrapper::get('write_queue');
         $this->client = $stompClient->client;
 
-        $this->log = App::make('stompLog');
+        $this->log = app('stompLog');
     }
 
     /**
