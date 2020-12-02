@@ -10,7 +10,6 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\WorkerStopping;
-use Illuminate\Support\Facades\App;
 
 class StompConnector implements ConnectorInterface
 {
@@ -53,9 +52,9 @@ class StompConnector implements ConnectorInterface
     {
         switch (ConfigWrapper::get('worker')) {
             case 'horizon':
-                return App::make(HorizonStompQueue::class);
+                return app()->make(HorizonStompQueue::class);
             default:
-                return App::make(StompQueue::class);
+                return app()->make(StompQueue::class);
         }
     }
 }

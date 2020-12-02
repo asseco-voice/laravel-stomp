@@ -18,7 +18,6 @@ use Illuminate\Queue\CallQueuedClosure;
 use Illuminate\Queue\InvalidPayloadException;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\StatefulStomp;
@@ -60,7 +59,7 @@ class StompQueue extends Queue implements QueueInterface
         $this->writeQueue = ConfigWrapper::get('write_queue');
         $this->client = $stompClient->client;
 
-        $this->log = App::make('stompLog');
+        $this->log = app()->make('stompLog');
     }
 
     /**
@@ -141,10 +140,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueue,
-        ], true));
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueue,
+            ], true));
 
         return $this->client->send($writeQueue, $payload);
     }
@@ -216,7 +215,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string) Str::uuid();
+            $payload['uuid'] = (string)Str::uuid();
         }
 
         return $payload;

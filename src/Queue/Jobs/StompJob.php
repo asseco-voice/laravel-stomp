@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
@@ -34,7 +33,7 @@ class StompJob extends Job implements JobContract
         $this->connectionName = 'stomp';
         $this->queue = $queue;
 
-        $this->log = App::make('stompLog');
+        $this->log = app()->make('stompLog');
 
         $this->payload = $this->payload();
     }
@@ -146,9 +145,9 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         $this->log->info('[STOMP] Deleting a message from queue: ' . print_r([
-            'queue'   => $this->queue,
-            'message' => $this->frame,
-        ], true));
+                'queue'   => $this->queue,
+                'message' => $this->frame,
+            ], true));
 
         parent::delete();
     }
