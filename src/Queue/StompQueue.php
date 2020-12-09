@@ -337,7 +337,10 @@ class StompQueue extends Queue implements QueueInterface
     public function forgetHeadersForRedelivery(array $headers): array
     {
         // TODO: remove ActiveMq hard coding
-        Arr::forget($headers, ['_AMQ_SCHED_DELIVERY', 'content-length']);
+        $keys = array_keys($headers);
+        $amqMatches = preg_grep('/_AMQ.*/i', $keys);
+
+        Arr::forget($headers, array_merge($amqMatches, ['content-length']));
 
         return $headers;
     }
