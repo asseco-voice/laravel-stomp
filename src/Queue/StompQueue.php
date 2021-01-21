@@ -134,18 +134,18 @@ class StompQueue extends Queue implements QueueInterface
             $payload = $this->wrapStompMessage($payload);
         }
 
-        $writeQueue = $queue ?: $this->getWriteQueue();
+        $writeQueues = $queue ?: $this->getWriteQueue();
 
         /**
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueue,
-        ], true));
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueues,
+            ], true));
 
-        return $this->client->send($writeQueue, $payload);
+        return $this->writeToMultipleQueues($writeQueues, $payload);
     }
 
     protected function wrapStompMessage(string $payload): Message
@@ -157,6 +157,25 @@ class StompQueue extends Queue implements QueueInterface
         $headers = $this->forgetHeadersForRedelivery($headers);
 
         return new Message(json_encode($body), $headers);
+    }
+
+    protected function writeToMultipleQueues(string $writeQueues, Message $payload): bool
+    {
+        $allEventsSent = true;
+
+        foreach (explode(';', $writeQueues) as $writeQueue) {
+            $sent = $this->client->send($writeQueue, $payload);
+
+            if(!$sent){
+                $allEventsSent = false;
+                $this->log->error("[STOMP] Message not sent on queue: $writeQueue");
+                continue;
+            }
+
+            $this->log->info("[STOMP] Message sent on queue: $writeQueue");
+        }
+
+        return $allEventsSent;
     }
 
     /**
