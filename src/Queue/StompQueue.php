@@ -140,10 +140,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-                'body'    => $payload->getBody(),
-                'headers' => $payload->getHeaders(),
-                'queue'   => $writeQueues,
-            ], true));
+            'body'    => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue'   => $writeQueues,
+        ], true));
 
         return $this->writeToMultipleQueues($writeQueues, $payload);
     }
@@ -166,7 +166,7 @@ class StompQueue extends Queue implements QueueInterface
         foreach (explode(';', $writeQueues) as $writeQueue) {
             $sent = $this->client->send($writeQueue, $payload);
 
-            if(!$sent){
+            if (!$sent) {
                 $allEventsSent = false;
                 $this->log->error("[STOMP] Message not sent on queue: $writeQueue");
                 continue;
