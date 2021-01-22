@@ -33,8 +33,11 @@ STOMP_WORKER        job worker to be used (defaults to 'default' can be 'horizon
 
 If you want to subscribe on multiple queues, use ``;`` as a separator between them: `STOMP_READ_QUEUES=queue1;queue2`
 
-The package will always write to a single queue, so be sure to include a
+The package will usually write to a single queue, so be sure to include a
 ``STOMP_WRITE_QUEUE`` in case `STOMP_READ_QUEUES` has multiple queues to read from.
+
+If you have the need to push the same message on multiple topics, you can provide those 
+specifically with ``;`` separator on an event directly.
 
 If ``horizon`` is used as worker, library will work side-by-side with 
 [Laravel Horizon](https://laravel.com/docs/7.x/horizon) and basic configuration will be 
