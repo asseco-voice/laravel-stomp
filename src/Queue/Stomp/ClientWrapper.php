@@ -29,8 +29,8 @@ class ClientWrapper
 
     protected function setCredentials(Client $client): void
     {
-        $username = ConfigWrapper::get('username');
-        $password = ConfigWrapper::get('password');
+        $username = Config::get('username');
+        $password = Config::get('password');
 
         if ($username && $password) {
             $client->setLogin($username, $password);

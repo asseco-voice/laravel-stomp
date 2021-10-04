@@ -21,14 +21,14 @@ QUEUE_CONNECTION=stomp
 ``.env`` variables you can override:
 
 ```
-STOMP_READ_QUEUES   queue(s) name to read from (defaults to 'default')
-STOMP_WRITE_QUEUE   queue name to write to (defaults to first read queue)
-STOMP_PROTOCOL      protocol (defaults to TCP)
-STOMP_HOST          broker host (defaults to 127.0.0.1)
-STOMP_PORT          port where STOMP is exposed in your broker (defaults to 61613)
-STOMP_USERNAME      broker username (defaults to admin)
-STOMP_PASSWORD      broker password (defaults to admin)
-STOMP_WORKER        job worker to be used (defaults to 'default' can be 'horizon')
+STOMP_READ_QUEUES    queue(s) name to read from (defaults to 'default')
+STOMP_WRITE_QUEUES   queue name to write to (defaults to 'default')
+STOMP_PROTOCOL       protocol (defaults to TCP)
+STOMP_HOST           broker host (defaults to 127.0.0.1)
+STOMP_PORT           port where STOMP is exposed in your broker (defaults to 61613)
+STOMP_USERNAME       broker username (defaults to admin)
+STOMP_PASSWORD       broker password (defaults to admin)
+STOMP_WORKER         job worker to be used (defaults to 'default' can be 'horizon')
 ```
 
 If you want to subscribe on multiple queues, use ``;`` as a separator between them: `STOMP_READ_QUEUES=queue1;queue2`

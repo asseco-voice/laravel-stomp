@@ -6,7 +6,7 @@ use Asseco\Stomp\Queue\Contracts\HasHeaders;
 use Asseco\Stomp\Queue\Contracts\HasRawData;
 use Asseco\Stomp\Queue\Jobs\StompJob;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\Config;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -30,15 +30,12 @@ class StompQueue extends Queue implements QueueInterface
     public const HEADERS_KEY = '_headers';
 
     /**
-     * Queue name.
+     * Stomp instance from stomp-php repo.
      */
-    public string $readQueues;
+    public StatefulStomp $client;
 
-    /**
-     * Queue to write to.
-     * @var string
-     */
-    public string $writeQueue;
+    public array $readQueues;
+    public array $writeQueues;
 
     /**
      * List of queues already subscribed to. Preventing multiple same subscriptions.
@@ -46,39 +43,47 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected array $subscribedTo = [];
 
-    /**
-     * Stomp instance from stomp-php repo.
-     */
-    public StatefulStomp $client;
-
     protected LoggerInterface $log;
 
     public function __construct(ClientWrapper $stompClient)
     {
-        $this->readQueues = $this->appendQueue(ConfigWrapper::get('read_queues'));
-        $this->writeQueue = ConfigWrapper::get('write_queue');
+        $this->readQueues = $this->setReadQueues();
+        $this->writeQueues = $this->setWriteQueues();
         $this->client = $stompClient->client;
-
         $this->log = app('stompLog');
     }
 
     /**
      * Append queue name to topic/address to avoid random hashes in broker.
      *
-     * @param string $queues
-     * @return string
+     * @return array
      */
-    protected function appendQueue(string $queues): string
+    protected function setReadQueues(): array
     {
-        $default = ConfigWrapper::get('default_queue');
+        $queues = $this->parseQueues(Config::get('read_queues'));
 
-        return implode(';', array_map(function ($queue) use ($default) {
+        foreach ($queues as &$queue) {
+            $default = Config::get('default_queue');
+
             if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
-                return $queue . self::AMQ_QUEUE_SEPARATOR . $default . '_' . Str::uuid();
+                $queue .= self::AMQ_QUEUE_SEPARATOR . $default . '_' . substr(Str::uuid(), -5);
+                continue;
             }
 
-            return $queue;
-        }, $this->parseDelimitedQueues($queues)));
+            if(Config::get('prepend_queues')){
+                $topic = Str::before($queue, self::AMQ_QUEUE_SEPARATOR);
+                $queueName = Str::after($queue, self::AMQ_QUEUE_SEPARATOR);
+
+                $queue = $topic . self::AMQ_QUEUE_SEPARATOR . "{$topic}_{$default}_{$queueName}";
+            }
+        }
+
+        return $queues;
+    }
+
+    protected function setWriteQueues(): array
+    {
+        return $this->parseQueues(Config::get('write_queues'));
     }
 
     /**
@@ -134,16 +139,16 @@ class StompQueue extends Queue implements QueueInterface
             $payload = $this->wrapStompMessage($payload);
         }
 
-        $writeQueues = $queue ?: $this->getWriteQueue();
+        $writeQueues = $queue ? $this->parseQueues($queue) : $this->writeQueues;
 
         /**
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueues,
-        ], true));
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueues,
+            ], true));
 
         return $this->writeToMultipleQueues($writeQueues, $payload);
     }
@@ -159,11 +164,11 @@ class StompQueue extends Queue implements QueueInterface
         return new Message(json_encode($body), $headers);
     }
 
-    protected function writeToMultipleQueues(string $writeQueues, Message $payload): bool
+    protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
     {
         $allEventsSent = true;
 
-        foreach (explode(';', $writeQueues) as $writeQueue) {
+        foreach ($writeQueues as $writeQueue) {
             $sent = $this->client->send($writeQueue, $payload);
 
             if (!$sent) {
@@ -234,7 +239,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string) Str::uuid();
+            $payload['uuid'] = (string)Str::uuid();
         }
 
         return $payload;
@@ -256,13 +261,6 @@ class StompQueue extends Queue implements QueueInterface
     protected function hasEvent($job): bool
     {
         return $job instanceof BroadcastEvent && property_exists($job, 'event');
-    }
-
-    protected function getWriteQueue()
-    {
-        $queues = $this->parseDelimitedQueues($this->writeQueue);
-
-        return $queues[0];
     }
 
     /**
@@ -294,35 +292,21 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function subscribeToQueues(): void
     {
-        $queues = $this->parseDelimitedQueues($this->readQueues);
-
-        foreach ($queues as $queue) {
+        foreach ($this->readQueues as $queue) {
             $alreadySubscribed = in_array($queue, $this->subscribedTo);
 
             if ($alreadySubscribed) {
                 continue;
             }
 
-            $getQueue = $this->getReadQueues($queue);
-            $this->client->subscribe($getQueue);
-            $this->subscribedTo[] = $getQueue;
+            $this->client->subscribe($queue);
+            $this->subscribedTo[] = $queue;
         }
     }
 
-    protected function parseDelimitedQueues(string $queue): array
+    protected function parseQueues(string $queue): array
     {
         return explode(';', $queue);
-    }
-
-    /**
-     * Get the queue or return the default.
-     *
-     * @param string|null $queue
-     * @return string
-     */
-    protected function getReadQueues(?string $queue): string
-    {
-        return $queue ?: $this->readQueues;
     }
 
     protected function getQueueFromFrame(Frame $frame): string

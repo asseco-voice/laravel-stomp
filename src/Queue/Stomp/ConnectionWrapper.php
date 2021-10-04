@@ -10,9 +10,9 @@ class ConnectionWrapper
 
     public function __construct()
     {
-        $protocol = ConfigWrapper::get('protocol');
-        $host = ConfigWrapper::get('host');
-        $port = ConfigWrapper::get('port');
+        $protocol = Config::get('protocol');
+        $host = Config::get('host');
+        $port = Config::get('port');
 
         $this->connection = new Connection("$protocol://$host:$port");
 
