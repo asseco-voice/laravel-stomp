@@ -130,9 +130,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue.
      *
-     * @param mixed $payload
-     * @param string|null $queue
-     * @param array $options
+     * @param  mixed  $payload
+     * @param  string|null  $queue
+     * @param  array  $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -158,7 +158,7 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param Frame $payload
+     * @param  Frame  $payload
      * @return mixed
      */
     protected function addCorrelationHeader($payload)
@@ -169,7 +169,7 @@ class StompQueue extends Queue implements QueueInterface
 
         $header = Str::uuid()->toString();
 
-        if(request()->hasHeader(self::CORRELATION)){
+        if (request()->hasHeader(self::CORRELATION)) {
             $header = request()->header(self::CORRELATION);
         }
 
@@ -179,8 +179,8 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param Frame $payload
-     * @param string $header
+     * @param  Frame  $payload
+     * @param  string  $header
      * @return bool
      */
     protected function needsHeader($payload, string $header): bool
