@@ -28,6 +28,7 @@ class StompQueue extends Queue implements QueueInterface
 {
     public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
+    const CORRELATION = 'X-Correlation-ID';
 
     /**
      * Stomp instance from stomp-php repo.
@@ -70,7 +71,7 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            if(Config::get('prepend_queues')){
+            if (Config::get('prepend_queues')) {
                 $topic = Str::before($queue, self::AMQ_QUEUE_SEPARATOR);
                 $queueName = Str::after($queue, self::AMQ_QUEUE_SEPARATOR);
 
@@ -128,7 +129,7 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue.
      *
-     * @param string $payload
+     * @param mixed $payload
      * @param string|null $queue
      * @param array $options
      * @return mixed
@@ -138,6 +139,8 @@ class StompQueue extends Queue implements QueueInterface
         if (!$payload instanceof Message) {
             $payload = $this->wrapStompMessage($payload);
         }
+
+        $payload = $this->addCorrelationHeader($payload);
 
         $writeQueues = $queue ? $this->parseQueues($queue) : $this->writeQueues;
 
@@ -151,6 +154,39 @@ class StompQueue extends Queue implements QueueInterface
             ], true));
 
         return $this->writeToMultipleQueues($writeQueues, $payload);
+    }
+
+    /**
+     * @param Frame $payload
+     * @return mixed
+     */
+    protected function addCorrelationHeader($payload)
+    {
+        if (!$this->needsHeader($payload, self::CORRELATION)) {
+            return $payload;
+        }
+
+        $header = Str::uuid()->toString();
+
+        if(request()->hasHeader(self::CORRELATION)){
+            $header = request()->header(self::CORRELATION);
+        }
+
+        $payload->addHeaders([self::CORRELATION => $header]);
+
+        return $payload;
+    }
+
+    /**
+     * @param Frame $payload
+     * @param string $header
+     * @return bool
+     */
+    protected function needsHeader($payload, string $header): bool
+    {
+        $headers = $payload->getHeaders();
+
+        return !Arr::has($headers, [$header]);
     }
 
     protected function wrapStompMessage(string $payload): Message
@@ -284,6 +320,8 @@ class StompQueue extends Queue implements QueueInterface
         if (is_null($frame) || !($frame instanceof Frame)) {
             return null;
         }
+
+        $this->addCorrelationHeader($frame);
 
         $this->log->info('[STOMP] Popping a job (frame) from queue: ' . print_r($frame, true));
 
