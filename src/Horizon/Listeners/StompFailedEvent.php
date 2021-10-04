@@ -20,7 +20,7 @@ class StompFailedEvent
     /**
      * Create a new listener instance.
      *
-     * @param Dispatcher $events
+     * @param  Dispatcher  $events
      * @return void
      */
     public function __construct(Dispatcher $events)
@@ -31,7 +31,7 @@ class StompFailedEvent
     /**
      * Handle the event.
      *
-     * @param LaravelJobFailed $event
+     * @param  LaravelJobFailed  $event
      * @return void
      */
     public function handle(LaravelJobFailed $event): void

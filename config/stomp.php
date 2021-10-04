@@ -50,7 +50,7 @@ return [
     /**
      * Should the read queues be prepended. Useful for i.e. Artemis where queue
      * name is unique across whole broker instance. This will thus add some
-     * uniqueness to the queues
+     * uniqueness to the queues.
      */
     'prepend_queues' => true,
 ];

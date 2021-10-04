@@ -11,7 +11,9 @@ class ClientWrapper
 
     /**
      * ClientWrapper constructor.
-     * @param ConnectionWrapper $connectionWrapper
+     *
+     * @param  ConnectionWrapper  $connectionWrapper
+     *
      * @throws \Stomp\Exception\StompException
      */
     public function __construct(ConnectionWrapper $connectionWrapper)
