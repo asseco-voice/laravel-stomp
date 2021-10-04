@@ -60,7 +60,7 @@ class StompQueue extends BaseStompQueue
         $payload = (new JobPayload($payload))->prepare($this->lastPushed)->value;
 
         return tap(parent::pushRaw($payload, $queue, $options), function () use ($queue, $payload) {
-            $this->event($this->getReadQueues($queue), new JobPushed($payload));
+            $this->event($queue, new JobPushed($payload));
         });
     }
 
@@ -80,7 +80,7 @@ class StompQueue extends BaseStompQueue
         $payload = (new JobPayload($this->createPayload($job, $queue, $data)))->prepare($job)->value;
 
         return tap(parent::pushRaw($payload, $queue, ['delay' => $this->secondsUntil($delay)]), function () use ($payload, $queue) {
-            $this->event($this->getReadQueues($queue), new JobPushed($payload));
+            $this->event($queue, new JobPushed($payload));
         });
     }
 
@@ -96,7 +96,7 @@ class StompQueue extends BaseStompQueue
     {
         return tap(parent::pop($queue), function ($job) use ($queue) {
             if ($job instanceof StompJob) {
-                $this->event($this->getReadQueues($queue), new JobDeleted($job, $job->getRawBody()));
+                $this->event($queue, new JobDeleted($job, $job->getRawBody()));
             }
         });
     }
@@ -112,7 +112,7 @@ class StompQueue extends BaseStompQueue
      */
     public function deleteReserved($queue, $job)
     {
-        $this->event($this->getReadQueues($queue), new JobDeleted($job, $job->getRawBody()));
+        $this->event($queue, new JobDeleted($job, $job->getRawBody()));
     }
 
     /**
