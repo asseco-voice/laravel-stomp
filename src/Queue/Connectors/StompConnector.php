@@ -26,8 +26,9 @@ class StompConnector implements ConnectorInterface
     /**
      * Establish a queue connection.
      *
-     * @param array $config
+     * @param  array  $config
      * @return \Illuminate\Contracts\Queue\Queue
+     *
      * @throws \Stomp\Exception\ConnectionException
      */
     public function connect(array $config)
