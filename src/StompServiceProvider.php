@@ -5,7 +5,7 @@ namespace Asseco\Stomp;
 use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
 use Asseco\Stomp\Queue\Connectors\StompConnector;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Asseco\Stomp\Queue\StompQueue;
 use Illuminate\Log\LogManager;
@@ -24,7 +24,7 @@ class StompServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
 
-        if (ConfigWrapper::get('worker') == 'horizon') {
+        if (Config::get('worker') == 'horizon') {
             $this->mergeConfigFrom(__DIR__ . '/../config/horizon.php', 'horizon');
         }
     }
@@ -36,7 +36,7 @@ class StompServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        app()->singleton(ConfigWrapper::class);
+        app()->singleton(Config::class);
         app()->singleton(ConnectionWrapper::class);
         app()->singleton(ClientWrapper::class);
 
@@ -50,7 +50,7 @@ class StompServiceProvider extends ServiceProvider
             return new StompConnector($this->app['events']);
         });
 
-        $logsEnabled = ConfigWrapper::get('enable_logs');
+        $logsEnabled = Config::get('enable_logs');
 
         app()->singleton('stompLog', function ($app) use ($logsEnabled) {
             return $logsEnabled ? new LogManager($app) : new NullLogger();

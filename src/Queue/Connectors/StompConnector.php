@@ -4,7 +4,7 @@ namespace Asseco\Stomp\Queue\Connectors;
 
 use Asseco\Stomp\Horizon\Listeners\StompFailedEvent;
 use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\StompQueue;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Connectors\ConnectorInterface;
@@ -26,8 +26,9 @@ class StompConnector implements ConnectorInterface
     /**
      * Establish a queue connection.
      *
-     * @param array $config
+     * @param  array  $config
      * @return \Illuminate\Contracts\Queue\Queue
+     *
      * @throws \Stomp\Exception\ConnectionException
      */
     public function connect(array $config)
@@ -50,7 +51,7 @@ class StompConnector implements ConnectorInterface
      */
     public function selectWorker()
     {
-        switch (ConfigWrapper::get('worker')) {
+        switch (Config::get('worker')) {
             case 'horizon':
                 return app(HorizonStompQueue::class);
             default:

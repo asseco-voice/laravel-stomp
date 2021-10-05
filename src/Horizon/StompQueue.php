@@ -22,7 +22,7 @@ class StompQueue extends BaseStompQueue
     /**
      * Get the number of queue jobs that are ready to process.
      *
-     * @param string|null $queue
+     * @param  string|null  $queue
      * @return int
      */
     public function readyNow($queue = null)
@@ -33,9 +33,9 @@ class StompQueue extends BaseStompQueue
     /**
      * Push a new job onto the queue.
      *
-     * @param object|string $job
-     * @param mixed $data
-     * @param string|null $queue
+     * @param  object|string  $job
+     * @param  mixed  $data
+     * @param  string|null  $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
@@ -48,10 +48,11 @@ class StompQueue extends BaseStompQueue
     /**
      * Push a raw payload onto the queue.
      *
-     * @param string $payload
-     * @param ?string $queue
-     * @param array $options
+     * @param  string  $payload
+     * @param  ?string  $queue
+     * @param  array  $options
      * @return mixed
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -59,18 +60,19 @@ class StompQueue extends BaseStompQueue
         $payload = (new JobPayload($payload))->prepare($this->lastPushed)->value;
 
         return tap(parent::pushRaw($payload, $queue, $options), function () use ($queue, $payload) {
-            $this->event($this->getReadQueues($queue), new JobPushed($payload));
+            $this->event($queue, new JobPushed($payload));
         });
     }
 
     /**
      * Push a new job onto the queue after a delay.
      *
-     * @param \DateTimeInterface|\DateInterval|int $delay
-     * @param string $job
-     * @param mixed $data
-     * @param ?string $queue
+     * @param  \DateTimeInterface|\DateInterval|int  $delay
+     * @param  string  $job
+     * @param  mixed  $data
+     * @param  ?string  $queue
      * @return mixed
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function later($delay, $job, $data = '', $queue = null)
@@ -78,22 +80,23 @@ class StompQueue extends BaseStompQueue
         $payload = (new JobPayload($this->createPayload($job, $queue, $data)))->prepare($job)->value;
 
         return tap(parent::pushRaw($payload, $queue, ['delay' => $this->secondsUntil($delay)]), function () use ($payload, $queue) {
-            $this->event($this->getReadQueues($queue), new JobPushed($payload));
+            $this->event($queue, new JobPushed($payload));
         });
     }
 
     /**
      * Pop the next job off of the queue.
      *
-     * @param string $queue
+     * @param  string  $queue
      * @return \Illuminate\Contracts\Queue\Job|null
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function pop($queue = null)
     {
         return tap(parent::pop($queue), function ($job) use ($queue) {
             if ($job instanceof StompJob) {
-                $this->event($this->getReadQueues($queue), new JobDeleted($job, $job->getRawBody()));
+                $this->event($queue, new JobDeleted($job, $job->getRawBody()));
             }
         });
     }
@@ -101,22 +104,24 @@ class StompQueue extends BaseStompQueue
     /**
      * Delete a reserved job from the queue.
      *
-     * @param string $queue
-     * @param StompJob $job
+     * @param  string  $queue
+     * @param  StompJob  $job
      * @return void
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function deleteReserved($queue, $job)
     {
-        $this->event($this->getReadQueues($queue), new JobDeleted($job, $job->getRawBody()));
+        $this->event($queue, new JobDeleted($job, $job->getRawBody()));
     }
 
     /**
      * Fire the given event if a dispatcher is bound.
      *
-     * @param string $queue
-     * @param mixed $event
+     * @param  string  $queue
+     * @param  mixed  $event
      * @return void
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     protected function event($queue, $event)

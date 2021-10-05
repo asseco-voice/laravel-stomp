@@ -2,7 +2,7 @@
 
 namespace Asseco\Stomp\Queue\Jobs;
 
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\StompQueue;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
@@ -66,7 +66,7 @@ class StompJob extends Job implements JobContract
      */
     public function maxTries()
     {
-        if (ConfigWrapper::get('auto_tries')) {
+        if (Config::get('auto_tries')) {
             return self::DEFAULT_TRIES;
         }
 
@@ -155,7 +155,7 @@ class StompJob extends Job implements JobContract
     /**
      * Release the job back into the queue.
      *
-     * @param int $delay
+     * @param  int  $delay
      * @return void
      */
     public function release($delay = 0)
@@ -172,7 +172,7 @@ class StompJob extends Job implements JobContract
         $attempts = $this->attempts() + 1;
         Arr::set($this->payload, 'attempts', $attempts);
 
-        $backoff = ConfigWrapper::get('auto_backoff') ? $this->getBackoff($attempts) : $delay;
+        $backoff = Config::get('auto_backoff') ? $this->getBackoff($attempts) : $delay;
         Arr::set($this->payload, 'backoff', $backoff);
 
         $delayHeader = $this->stompQueue->makeDelayHeader($backoff);
@@ -194,13 +194,13 @@ class StompJob extends Job implements JobContract
 
     protected function getBackoff(int $attempts): int
     {
-        return pow($attempts, ConfigWrapper::get('backoff_multiplier'));
+        return pow($attempts, Config::get('backoff_multiplier'));
     }
 
     /**
      * Process an exception that caused the job to fail.
      *
-     * @param \Throwable|null $e
+     * @param  \Throwable|null  $e
      * @return void
      */
     protected function failed($e)

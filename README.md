@@ -21,8 +21,8 @@ QUEUE_CONNECTION=stomp
 ``.env`` variables you can override:
 
 ```
-STOMP_READ_QUEUES   queue(s) name to read from (defaults to 'default')
-STOMP_WRITE_QUEUE   queue name to write to (defaults to first read queue)
+STOMP_READ_QUEUES   queue(s) name to read from
+STOMP_WRITE_QUEUES  queue name to write to
 STOMP_PROTOCOL      protocol (defaults to TCP)
 STOMP_HOST          broker host (defaults to 127.0.0.1)
 STOMP_PORT          port where STOMP is exposed in your broker (defaults to 61613)

@@ -11,7 +11,9 @@ class ClientWrapper
 
     /**
      * ClientWrapper constructor.
-     * @param ConnectionWrapper $connectionWrapper
+     *
+     * @param  ConnectionWrapper  $connectionWrapper
+     *
      * @throws \Stomp\Exception\StompException
      */
     public function __construct(ConnectionWrapper $connectionWrapper)
@@ -29,8 +31,8 @@ class ClientWrapper
 
     protected function setCredentials(Client $client): void
     {
-        $username = ConfigWrapper::get('username');
-        $password = ConfigWrapper::get('password');
+        $username = Config::get('username');
+        $password = Config::get('password');
 
         if ($username && $password) {
             $client->setLogin($username, $password);

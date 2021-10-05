@@ -2,7 +2,7 @@
 
 namespace Asseco\Stomp\Queue\Stomp;
 
-class ConfigWrapper
+class Config
 {
     const CONFIG_ARRAY_PATH = 'queue.connections.stomp.';
 

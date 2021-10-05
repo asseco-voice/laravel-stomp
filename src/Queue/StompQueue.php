@@ -6,7 +6,7 @@ use Asseco\Stomp\Queue\Contracts\HasHeaders;
 use Asseco\Stomp\Queue\Contracts\HasRawData;
 use Asseco\Stomp\Queue\Jobs\StompJob;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
-use Asseco\Stomp\Queue\Stomp\ConfigWrapper;
+use Asseco\Stomp\Queue\Stomp\Config;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -28,63 +28,70 @@ class StompQueue extends Queue implements QueueInterface
 {
     public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
-
-    /**
-     * Queue name.
-     */
-    public string $readQueues;
-
-    /**
-     * Queue to write to.
-     * @var string
-     */
-    public string $writeQueue;
-
-    /**
-     * List of queues already subscribed to. Preventing multiple same subscriptions.
-     * @var array
-     */
-    protected array $subscribedTo = [];
+    const CORRELATION = 'X-Correlation-ID';
 
     /**
      * Stomp instance from stomp-php repo.
      */
     public StatefulStomp $client;
 
+    public array $readQueues;
+    public array $writeQueues;
+
+    /**
+     * List of queues already subscribed to. Preventing multiple same subscriptions.
+     *
+     * @var array
+     */
+    protected array $subscribedTo = [];
+
     protected LoggerInterface $log;
 
     public function __construct(ClientWrapper $stompClient)
     {
-        $this->readQueues = $this->appendQueue(ConfigWrapper::get('read_queues'));
-        $this->writeQueue = ConfigWrapper::get('write_queue');
+        $this->readQueues = $this->setReadQueues();
+        $this->writeQueues = $this->setWriteQueues();
         $this->client = $stompClient->client;
-
         $this->log = app('stompLog');
     }
 
     /**
      * Append queue name to topic/address to avoid random hashes in broker.
      *
-     * @param string $queues
-     * @return string
+     * @return array
      */
-    protected function appendQueue(string $queues): string
+    protected function setReadQueues(): array
     {
-        $default = ConfigWrapper::get('default_queue');
+        $queues = $this->parseQueues(Config::get('read_queues'));
 
-        return implode(';', array_map(function ($queue) use ($default) {
+        foreach ($queues as &$queue) {
+            $default = Config::get('default_queue');
+
             if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
-                return $queue . self::AMQ_QUEUE_SEPARATOR . $default . '_' . Str::uuid();
+                $queue .= self::AMQ_QUEUE_SEPARATOR . $default . '_' . substr(Str::uuid(), -5);
+                continue;
             }
 
-            return $queue;
-        }, $this->parseDelimitedQueues($queues)));
+            if (Config::get('prepend_queues')) {
+                $topic = Str::before($queue, self::AMQ_QUEUE_SEPARATOR);
+                $queueName = Str::after($queue, self::AMQ_QUEUE_SEPARATOR);
+
+                $queue = $topic . self::AMQ_QUEUE_SEPARATOR . "{$topic}_{$default}_{$queueName}";
+            }
+        }
+
+        return $queues;
+    }
+
+    protected function setWriteQueues(): array
+    {
+        return $this->parseQueues(Config::get('write_queues'));
     }
 
     /**
      * Get the size of the queue.
      *
-     * @param string|null $queue
+     * @param  string|null  $queue
      * @return int
      */
     public function size($queue = null)
@@ -96,9 +103,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue.
      *
-     * @param string|object $job
-     * @param mixed $data
-     * @param string|null $queue
+     * @param  string|object  $job
+     * @param  mixed  $data
+     * @param  string|null  $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
@@ -109,10 +116,10 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue after a delay.
      *
-     * @param DateTimeInterface|DateInterval|int $delay
-     * @param string|object $job
-     * @param mixed $data
-     * @param string|null $queue
+     * @param  DateTimeInterface|DateInterval|int  $delay
+     * @param  string|object  $job
+     * @param  mixed  $data
+     * @param  string|null  $queue
      * @return mixed
      */
     public function later($delay, $job, $data = '', $queue = null)
@@ -123,9 +130,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue.
      *
-     * @param string $payload
-     * @param string|null $queue
-     * @param array $options
+     * @param  mixed  $payload
+     * @param  string|null  $queue
+     * @param  array  $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -134,7 +141,9 @@ class StompQueue extends Queue implements QueueInterface
             $payload = $this->wrapStompMessage($payload);
         }
 
-        $writeQueues = $queue ?: $this->getWriteQueue();
+        $payload = $this->addCorrelationHeader($payload);
+
+        $writeQueues = $queue ? $this->parseQueues($queue) : $this->writeQueues;
 
         /**
          * @var $payload Message
@@ -148,6 +157,39 @@ class StompQueue extends Queue implements QueueInterface
         return $this->writeToMultipleQueues($writeQueues, $payload);
     }
 
+    /**
+     * @param  Frame  $payload
+     * @return mixed
+     */
+    protected function addCorrelationHeader($payload)
+    {
+        if (!$this->needsHeader($payload, self::CORRELATION)) {
+            return $payload;
+        }
+
+        $header = Str::uuid()->toString();
+
+        if (request()->hasHeader(self::CORRELATION)) {
+            $header = request()->header(self::CORRELATION);
+        }
+
+        $payload->addHeaders([self::CORRELATION => $header]);
+
+        return $payload;
+    }
+
+    /**
+     * @param  Frame  $payload
+     * @param  string  $header
+     * @return bool
+     */
+    protected function needsHeader($payload, string $header): bool
+    {
+        $headers = $payload->getHeaders();
+
+        return !Arr::has($headers, [$header]);
+    }
+
     protected function wrapStompMessage(string $payload): Message
     {
         $decoded = json_decode($payload, true);
@@ -159,11 +201,11 @@ class StompQueue extends Queue implements QueueInterface
         return new Message(json_encode($body), $headers);
     }
 
-    protected function writeToMultipleQueues(string $writeQueues, Message $payload): bool
+    protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
     {
         $allEventsSent = true;
 
-        foreach (explode(';', $writeQueues) as $writeQueue) {
+        foreach ($writeQueues as $writeQueue) {
             $sent = $this->client->send($writeQueue, $payload);
 
             if (!$sent) {
@@ -184,7 +226,7 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @param $job
      * @param $queue
-     * @param string $data
+     * @param  string  $data
      * @return Message
      */
     protected function createPayload($job, $queue, $data = '')
@@ -213,9 +255,9 @@ class StompQueue extends Queue implements QueueInterface
      * Overridden to support raw data
      * Create a payload array from the given job and data.
      *
-     * @param object|string $job
-     * @param string $queue
-     * @param string $data
+     * @param  object|string  $job
+     * @param  string  $queue
+     * @param  string  $data
      * @return array
      */
     protected function createPayloadArray($job, $queue, $data = '')
@@ -258,17 +300,10 @@ class StompQueue extends Queue implements QueueInterface
         return $job instanceof BroadcastEvent && property_exists($job, 'event');
     }
 
-    protected function getWriteQueue()
-    {
-        $queues = $this->parseDelimitedQueues($this->writeQueue);
-
-        return $queues[0];
-    }
-
     /**
      * Pop the next job off of the queue.
      *
-     * @param string|null $queue
+     * @param  string|null  $queue
      * @return Job|null
      */
     public function pop($queue = null)
@@ -287,6 +322,8 @@ class StompQueue extends Queue implements QueueInterface
             return null;
         }
 
+        $this->addCorrelationHeader($frame);
+
         $this->log->info('[STOMP] Popping a job (frame) from queue: ' . print_r($frame, true));
 
         return new StompJob($this->container, $this, $frame, $this->getQueueFromFrame($frame));
@@ -294,35 +331,21 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function subscribeToQueues(): void
     {
-        $queues = $this->parseDelimitedQueues($this->readQueues);
-
-        foreach ($queues as $queue) {
+        foreach ($this->readQueues as $queue) {
             $alreadySubscribed = in_array($queue, $this->subscribedTo);
 
             if ($alreadySubscribed) {
                 continue;
             }
 
-            $getQueue = $this->getReadQueues($queue);
-            $this->client->subscribe($getQueue);
-            $this->subscribedTo[] = $getQueue;
+            $this->client->subscribe($queue);
+            $this->subscribedTo[] = $queue;
         }
     }
 
-    protected function parseDelimitedQueues(string $queue): array
+    protected function parseQueues(string $queue): array
     {
         return explode(';', $queue);
-    }
-
-    /**
-     * Get the queue or return the default.
-     *
-     * @param string|null $queue
-     * @return string
-     */
-    protected function getReadQueues(?string $queue): string
-    {
-        return $queue ?: $this->readQueues;
     }
 
     protected function getQueueFromFrame(Frame $frame): string
@@ -350,7 +373,7 @@ class StompQueue extends Queue implements QueueInterface
      * If these values are left in the header, it will screw up the whole event redelivery
      * so we need to remove them before sending back to queue.
      *
-     * @param array $headers
+     * @param  array  $headers
      * @return array
      */
     public function forgetHeadersForRedelivery(array $headers): array
