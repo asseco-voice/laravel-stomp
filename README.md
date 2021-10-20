@@ -18,26 +18,32 @@ connection driver in ``.env`` file:
 QUEUE_CONNECTION=stomp
 ```
 
-``.env`` variables you can override:
+Connection variables:
 
 ```
-STOMP_READ_QUEUES   queue(s) name to read from
-STOMP_WRITE_QUEUES  queue name to write to
 STOMP_PROTOCOL      protocol (defaults to TCP)
 STOMP_HOST          broker host (defaults to 127.0.0.1)
 STOMP_PORT          port where STOMP is exposed in your broker (defaults to 61613)
 STOMP_USERNAME      broker username (defaults to admin)
 STOMP_PASSWORD      broker password (defaults to admin)
-STOMP_WORKER        job worker to be used (defaults to 'default' can be 'horizon')
 ```
 
-If you want to subscribe on multiple queues, use ``;`` as a separator between them: `STOMP_READ_QUEUES=queue1;queue2`
+You can subscribe to queues to read from or to write to with:
 
-The package will usually write to a single queue, so be sure to include a
-``STOMP_WRITE_QUEUE`` in case `STOMP_READ_QUEUES` has multiple queues to read from.
+```
+STOMP_READ_QUEUES=...
+STOMP_WRITE_QUEUES=...
+```
 
-If you have the need to push the same message on multiple topics, you can provide those 
-specifically with ``;`` separator on an event directly.
+Both have same nomenclature when it comes to subscribing:
+```
+topic                        <-- will read from all queues on the topic
+topic::queue1                <-- will read only from queue1 on the topic
+topic::queue1;topic::queue2  <-- will read from queue1 and queue2 on the topic
+```
+
+You can see all other available ``.env`` variables, their defaults and usage explanation within 
+the [config file](config/stomp.php). 
 
 If ``horizon`` is used as worker, library will work side-by-side with 
 [Laravel Horizon](https://laravel.com/docs/7.x/horizon) and basic configuration will be 
