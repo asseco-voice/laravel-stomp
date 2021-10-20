@@ -62,10 +62,10 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function setReadQueues(): array
     {
-        $queues = $this->parseQueues(Config::get('read_queues'));
+        $queues = $this->parseQueues(Config::readQueues());
 
         foreach ($queues as &$queue) {
-            $default = Config::get('default_queue');
+            $default = Config::defaultQueue();
 
             if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
                 $queue .= self::AMQ_QUEUE_SEPARATOR . $default . '_' . substr(Str::uuid(), -5);
@@ -85,7 +85,7 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function setWriteQueues(): array
     {
-        return $this->parseQueues(Config::get('write_queues'));
+        return $this->parseQueues(Config::writeQueues());
     }
 
     /**

@@ -1,12 +1,10 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     'driver'             => 'stomp',
-    'read_queues'        => env('STOMP_READ_QUEUES', 'default'),
-    'write_queues'       => env('STOMP_WRITE_QUEUES', Str::snake(env('APP_NAME', 'localhost'))),
+    'read_queues'        => env('STOMP_READ_QUEUES'),
+    'write_queues'       => env('STOMP_WRITE_QUEUES'),
     'protocol'           => env('STOMP_PROTOCOL', 'tcp'),
     'host'               => env('STOMP_HOST', '127.0.0.1'),
     'port'               => env('STOMP_PORT', 61613),
@@ -43,7 +41,7 @@ return [
      * hash as queue name. In case of multiple services connecting in such
      * a way, it becomes unclear which queue is from which service.
      */
-    'default_queue'      => Str::snake(env('APP_NAME', 'localhost')),
+    'default_queue'      => env('STOMP_DEFAULT_QUEUE'),
 
     'enable_logs'    => env('STOMP_LOGS', false) === true,
 
