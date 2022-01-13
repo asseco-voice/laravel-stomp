@@ -43,12 +43,20 @@ return [
      */
     'default_queue'      => env('STOMP_DEFAULT_QUEUE'),
 
-    'enable_logs'    => env('STOMP_LOGS', false) === true,
+    /**
+     * Use Laravel logger for outputting logs
+     */
+    'enable_logs'        => env('STOMP_LOGS', false) === true,
 
     /**
      * Should the read queues be prepended. Useful for i.e. Artemis where queue
      * name is unique across whole broker instance. This will thus add some
      * uniqueness to the queues.
      */
-    'prepend_queues' => true,
+    'prepend_queues'     => true,
+
+    /**
+     * Heartbeat which will be requested from server at given millisecond period
+     */
+    'receive_heartbeat'  => env('STOMP_RECEIVE_HEARTBEAT', 5000),
 ];

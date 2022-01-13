@@ -16,6 +16,6 @@ class ConnectionWrapper
 
         $this->connection = new Connection("$protocol://$host:$port");
 
-        $this->connection->setReadTimeout(30, 0);
+        $this->connection->setReadTimeout(0, 0);
     }
 }
