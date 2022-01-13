@@ -44,7 +44,7 @@ return [
     'default_queue'      => env('STOMP_DEFAULT_QUEUE'),
 
     /**
-     * Use Laravel logger for outputting logs
+     * Use Laravel logger for outputting logs.
      */
     'enable_logs'        => env('STOMP_LOGS', false) === true,
 
@@ -56,7 +56,7 @@ return [
     'prepend_queues'     => true,
 
     /**
-     * Heartbeat which will be requested from server at given millisecond period
+     * Heartbeat which will be requested from server at given millisecond period.
      */
     'receive_heartbeat'  => env('STOMP_RECEIVE_HEARTBEAT', 5000),
 ];
