@@ -7,6 +7,7 @@ use Asseco\Stomp\Queue\Contracts\HasRawData;
 use Asseco\Stomp\Queue\Jobs\StompJob;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
+use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -20,6 +21,7 @@ use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
+use Stomp\Network\Observer\ServerAliveObserver;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
@@ -305,12 +307,17 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @param  string|null  $queue
      * @return Job|null
+     *
+     * @throws \Stomp\Exception\ConnectionException
+     * @throws \Stomp\Exception\StompException
      */
     public function pop($queue = null)
     {
+        $this->checkIfServerAlive();
+        $this->client->getClient()->getConnection()->sendAlive();
+        $this->subscribeToQueues();
+
         try {
-            $this->client->getClient()->getConnection()->sendAlive();
-            $this->subscribeToQueues();
             $frame = $this->client->read();
         } catch (Exception $e) {
             $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
@@ -385,5 +392,41 @@ class StompQueue extends Queue implements QueueInterface
         Arr::forget($headers, array_merge($amqMatches, ['content-length']));
 
         return $headers;
+    }
+
+    /**
+     * @throws \Stomp\Exception\StompException
+     */
+    protected function checkIfServerAlive(): void
+    {
+        $observers = $this->client->getClient()->getConnection()->getObservers()->getObservers();
+
+        foreach ($observers as $observer) {
+            if (!($observer instanceof ServerAliveObserver)) {
+                continue;
+            }
+
+            if ($observer->isEnabled() && $observer->isDelayed()) {
+                $this->reconnect();
+            }
+        }
+    }
+
+    /**
+     * @throws \Stomp\Exception\StompException
+     */
+    protected function reconnect()
+    {
+        $this->flush();
+
+        $connectionWrapper = new ConnectionWrapper();
+        $clientWrapper = new ClientWrapper($connectionWrapper);
+        $this->client = $clientWrapper->client;
+    }
+
+    protected function flush(): void
+    {
+        $this->subscribedTo = [];
+        $this->client->getClient()->disconnect();
     }
 }
