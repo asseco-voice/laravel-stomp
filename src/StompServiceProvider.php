@@ -8,7 +8,6 @@ use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Asseco\Stomp\Queue\StompQueue;
-use Illuminate\Log\LogManager;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\NullLogger;
@@ -22,6 +21,8 @@ class StompServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        $this->mergeConfigFrom(__DIR__ . '/../config/asseco-stomp.php', 'asseco-stomp');
+
         $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
 
         if (Config::get('worker') == 'horizon') {
@@ -53,7 +54,9 @@ class StompServiceProvider extends ServiceProvider
         $logsEnabled = Config::get('enable_logs');
 
         app()->singleton('stompLog', function ($app) use ($logsEnabled) {
-            return $logsEnabled ? new LogManager($app) : new NullLogger();
+            $logManager = config('asseco-stomp.log_manager');
+
+            return $logsEnabled ? new $logManager($app) : new NullLogger();
         });
     }
 }
