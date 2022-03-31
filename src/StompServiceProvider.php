@@ -8,7 +8,6 @@ use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Asseco\Stomp\Queue\StompQueue;
-use Asseco\Stomp\LogManager;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\NullLogger;
