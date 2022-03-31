@@ -127,7 +127,12 @@ payload to the broker.
 
 ## Logs
 
-Logs are turned off by default. You can include them by setting env key ``STOMP_LOGS=true``.
+Logs are turned off by default. You can include them by setting env key ``STOMP_LOGS=true``. 
+
+In case you want to change
+the default log manager, it can be done in the ``asseco-stomp`` config file. The new log manager must extend
+``Illuminate\Log\LogManager``.
+
 
 ## Usage
 
