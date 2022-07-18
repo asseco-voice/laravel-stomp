@@ -20,15 +20,12 @@ class ClientWrapper
     public function __construct(ConnectionWrapper $connectionWrapper)
     {
         $client = new Client($connectionWrapper->connection);
-
-        $client->setSync(false);
-
         $this->setCredentials($client);
 
+        $client->setSync(false);
         $client->setHeartbeat(0, Config::get('receive_heartbeat'));
-
         $client->getConnection()->getObservers()->addObserver(new ServerAliveObserver());
-
+        $client->setClientId(config('app.name'));
         $client->connect();
 
         $this->client = new StatefulStomp($client);
