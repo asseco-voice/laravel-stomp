@@ -345,7 +345,11 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $this->client->subscribe($queue);
+            $this->client->subscribe($queue, null, 'auto', [
+                // New Artemis version can't work without this as it will consume only first message otherwise.
+                'consumer-window-size' => '-1',
+            ]);
+
             $this->subscribedTo[] = $queue;
         }
     }
