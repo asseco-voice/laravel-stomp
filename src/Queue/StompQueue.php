@@ -21,7 +21,7 @@ use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
-use Stomp\Network\Observer\ServerAliveObserver;
+use Stomp\Exception\ConnectionException;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
@@ -203,8 +203,17 @@ class StompQueue extends Queue implements QueueInterface
         return new Message(json_encode($body), $headers);
     }
 
+    /**
+     * @param  array  $writeQueues
+     * @param  Message  $payload
+     * @return bool
+     *
+     * @throws \Stomp\Exception\StompException
+     */
     protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
     {
+        $this->checkIfServerAlive();
+
         $allEventsSent = true;
 
         foreach ($writeQueues as $writeQueue) {
@@ -314,7 +323,6 @@ class StompQueue extends Queue implements QueueInterface
     public function pop($queue = null)
     {
         $this->checkIfServerAlive();
-        $this->client->getClient()->getConnection()->sendAlive();
         $this->subscribeToQueues();
 
         try {
@@ -399,20 +407,17 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * @return void
+     *
      * @throws \Stomp\Exception\StompException
      */
     protected function checkIfServerAlive(): void
     {
-        $observers = $this->client->getClient()->getConnection()->getObservers()->getObservers();
-
-        foreach ($observers as $observer) {
-            if (!($observer instanceof ServerAliveObserver)) {
-                continue;
-            }
-
-            if ($observer->isEnabled() && $observer->isDelayed()) {
-                $this->reconnect();
-            }
+        try {
+            $this->client->getClient()->getConnection()->sendAlive();
+        } catch (ConnectionException $e) {
+            $this->log->error('[Stomp] send alive error. Trying to reconnect.' . print_r($e, true));
+            $this->reconnect();
         }
     }
 

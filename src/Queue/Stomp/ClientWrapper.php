@@ -3,7 +3,6 @@
 namespace Asseco\Stomp\Queue\Stomp;
 
 use Stomp\Client;
-use Stomp\Network\Observer\ServerAliveObserver;
 use Stomp\StatefulStomp;
 
 class ClientWrapper
@@ -23,8 +22,7 @@ class ClientWrapper
         $this->setCredentials($client);
 
         $client->setSync(false);
-        $client->setHeartbeat(0, Config::get('receive_heartbeat'));
-        $client->getConnection()->getObservers()->addObserver(new ServerAliveObserver());
+        $client->setHeartbeat(Config::get('send_heartbeat'), Config::get('receive_heartbeat'));
         $client->setClientId(config('app.name'));
         $client->connect();
 
