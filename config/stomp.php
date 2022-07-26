@@ -58,5 +58,10 @@ return [
     /**
      * Heartbeat which will be requested from server at given millisecond period.
      */
-    'receive_heartbeat'  => env('STOMP_RECEIVE_HEARTBEAT', 5000),
+    'receive_heartbeat'  => env('STOMP_RECEIVE_HEARTBEAT', 0),
+
+    /**
+     * Heartbeat which we will be sending to server at given millisecond period.
+     */
+    'send_heartbeat'  => env('STOMP_SEND_HEARTBEAT', 5000),
 ];
