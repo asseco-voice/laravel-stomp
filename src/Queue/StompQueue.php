@@ -94,7 +94,7 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Get the size of the queue.
      *
-     * @param string|null $queue
+     * @param  string|null  $queue
      * @return int
      */
     public function size($queue = null)
@@ -106,9 +106,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue.
      *
-     * @param string|object $job
-     * @param mixed $data
-     * @param string|null $queue
+     * @param  string|object  $job
+     * @param  mixed  $data
+     * @param  string|null  $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
@@ -119,10 +119,10 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue after a delay.
      *
-     * @param DateTimeInterface|DateInterval|int $delay
-     * @param string|object $job
-     * @param mixed $data
-     * @param string|null $queue
+     * @param  DateTimeInterface|DateInterval|int  $delay
+     * @param  string|object  $job
+     * @param  mixed  $data
+     * @param  string|null  $queue
      * @return mixed
      */
     public function later($delay, $job, $data = '', $queue = null)
@@ -133,9 +133,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue.
      *
-     * @param mixed $payload
-     * @param string|null $queue
-     * @param array $options
+     * @param  mixed  $payload
+     * @param  string|null  $queue
+     * @param  array  $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -152,7 +152,7 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param Frame $payload
+     * @param  Frame  $payload
      * @return mixed
      */
     protected function addCorrelationHeader($payload)
@@ -173,8 +173,8 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param Frame $payload
-     * @param string $header
+     * @param  Frame  $payload
+     * @param  string  $header
      * @return bool
      */
     protected function needsHeader($payload, string $header): bool
@@ -196,8 +196,8 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param array $writeQueues
-     * @param Message $payload
+     * @param  array  $writeQueues
+     * @param  Message  $payload
      * @return bool
      */
     protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
@@ -206,11 +206,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-                'body'    => $payload->getBody(),
-                'headers' => $payload->getHeaders(),
-                'queue'   => $writeQueues,
-            ], true));
-
+            'body'    => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue'   => $writeQueues,
+        ], true));
 
         $allEventsSent = true;
 
@@ -237,13 +236,13 @@ class StompQueue extends Queue implements QueueInterface
 
             $sent = $this->client->send($queue, $payload);
         } catch (Exception) {
-            $this->log->error("[STOMP] PUSH failed. Reconnecting...");
+            $this->log->error('[STOMP] PUSH failed. Reconnecting...');
             $this->reconnect(false);
 
-            $this->log->info("[STOMP] Trying to send again...");
+            $this->log->info('[STOMP] Trying to send again...');
             $sent = $this->write($queue, $payload);
 
-            $this->log->info("[STOMP] Sent after..." . ($sent ? 't' : 'f'));
+            $this->log->info('[STOMP] Sent after...' . ($sent ? 't' : 'f'));
         }
 
         return $sent;
@@ -255,7 +254,7 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @param $job
      * @param $queue
-     * @param string $data
+     * @param  string  $data
      * @return Message
      */
     protected function createPayload($job, $queue, $data = '')
@@ -284,9 +283,9 @@ class StompQueue extends Queue implements QueueInterface
      * Overridden to support raw data
      * Create a payload array from the given job and data.
      *
-     * @param object|string $job
-     * @param string $queue
-     * @param string $data
+     * @param  object|string  $job
+     * @param  string  $queue
+     * @param  string  $data
      * @return array
      */
     protected function createPayloadArray($job, $queue, $data = '')
@@ -305,7 +304,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string)Str::uuid();
+            $payload['uuid'] = (string) Str::uuid();
         }
 
         return $payload;
@@ -332,7 +331,7 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Pop the next job off of the queue.
      *
-     * @param string|null $queue
+     * @param  string|null  $queue
      * @return Job|null
      */
     public function pop($queue = null)
@@ -367,17 +366,16 @@ class StompQueue extends Queue implements QueueInterface
             $this->subscribeToQueues();
 
             $frame = $this->client->read();
-            $this->log->info("[STOMP] Message read!");
+            $this->log->info('[STOMP] Message read!');
 
             return $frame;
         } catch (Exception $e) {
-
             $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
             $this->reconnect();
 
             // Need a recursive call as otherwise it loses the original connection, losing the events in the process
             // NOT WORKING though...
-            $this->log->info("[STOMP] Re-reading...");
+            $this->log->info('[STOMP] Re-reading...');
 
             return $this->read($queue);
         }
@@ -406,7 +404,7 @@ class StompQueue extends Queue implements QueueInterface
      * If these values are left in the header, it will screw up the whole event redelivery
      * so we need to remove them before sending back to queue.
      *
-     * @param array $headers
+     * @param  array  $headers
      * @return array
      */
     public function forgetHeadersForRedelivery(array $headers): array
@@ -431,14 +429,14 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function reconnect(bool $subscribe = true)
     {
-        $this->log->info("[STOMP] Reconnecting...");
+        $this->log->info('[STOMP] Reconnecting...');
 
         $this->disconnect();
 
         try {
             $this->client->getClient()->connect();
 
-            $this->log->info("[STOMP] Reconnected successfully.");
+            $this->log->info('[STOMP] Reconnected successfully.');
         } catch (Exception $e) {
             self::$circuitBreaker++;
             $cb = self::$circuitBreaker;
@@ -456,7 +454,7 @@ class StompQueue extends Queue implements QueueInterface
 
         // By this point it should be connected, so it is safe to subscribe
         if ($subscribe) {
-            $this->log->info("[STOMP] Connected, subscribing...");
+            $this->log->info('[STOMP] Connected, subscribing...');
             $this->subscribedTo = [];
             $this->subscribeToQueues();
         }
@@ -469,10 +467,10 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         try {
-            $this->log->info("[STOMP] Disconnecting...");
+            $this->log->info('[STOMP] Disconnecting...');
             $this->client->getClient()->disconnect();
         } catch (Exception $e) {
-            $this->log->info("[STOMP] Failed disconnecting: " . print_r($e->getMessage(), true));
+            $this->log->info('[STOMP] Failed disconnecting: ' . print_r($e->getMessage(), true));
         }
     }
 
