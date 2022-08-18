@@ -73,7 +73,7 @@ return [
     'send_heartbeat'     => env('STOMP_SEND_HEARTBEAT', 20000),
 
     /**
-     * Array of supported versions
+     * Array of supported versions.
      */
     'version'            => [Version::VERSION_1_2],
 ];

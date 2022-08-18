@@ -160,9 +160,9 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         $this->log->info("$this->session [STOMP] Deleting a message from queue: " . print_r([
-                'queue'   => $this->queue,
-                'message' => $this->frame,
-            ], true));
+            'queue'   => $this->queue,
+            'message' => $this->frame,
+        ], true));
 
         parent::delete();
     }
@@ -170,7 +170,7 @@ class StompJob extends Job implements JobContract
     /**
      * Release the job back into the queue.
      *
-     * @param int $delay
+     * @param  int  $delay
      * @return void
      */
     public function release($delay = 0)
@@ -215,7 +215,7 @@ class StompJob extends Job implements JobContract
     /**
      * Process an exception that caused the job to fail.
      *
-     * @param Throwable|null $e
+     * @param  Throwable|null  $e
      * @return void
      */
     protected function failed($e)
