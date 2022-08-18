@@ -14,14 +14,16 @@ use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
+use Throwable;
 
 class StompJob extends Job implements JobContract
 {
-    protected const DEFAULT_TRIES = 5;
+    protected const DEFAULT_TRIES = 2;
 
     protected StompQueue $stompQueue;
     protected Frame $frame;
     protected LoggerInterface $log;
+    protected string $session;
 
     protected array $payload;
 
@@ -32,6 +34,7 @@ class StompJob extends Job implements JobContract
         $this->frame = $frame;
         $this->connectionName = 'stomp';
         $this->queue = $queue;
+        $this->session = $this->stompQueue->client->getClient()->getSessionId();
 
         $this->log = app('stompLog');
 
@@ -73,6 +76,16 @@ class StompJob extends Job implements JobContract
         return parent::maxTries();
     }
 
+    public function shouldFailOnTimeout()
+    {
+        return Config::get('fail_on_timeout') ?: parent::shouldFailOnTimeout();
+    }
+
+    public function timeout()
+    {
+        return Config::get('timeout') ?: parent::timeout();
+    }
+
     /**
      * Overridden to include 2 fallbacks to standard Laravel jobs: one for external job ID's, other if that fails as well.
      * Get the job identifier.
@@ -91,6 +104,8 @@ class StompJob extends Job implements JobContract
      */
     public function fire()
     {
+        $this->log->info("$this->session [STOMP] Executing event...");
+
         $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
     }
 
@@ -144,10 +159,10 @@ class StompJob extends Job implements JobContract
      */
     public function delete()
     {
-        $this->log->info('[STOMP] Deleting a message from queue: ' . print_r([
-            'queue'   => $this->queue,
-            'message' => $this->frame,
-        ], true));
+        $this->log->info("$this->session [STOMP] Deleting a message from queue: " . print_r([
+                'queue'   => $this->queue,
+                'message' => $this->frame,
+            ], true));
 
         parent::delete();
     }
@@ -155,7 +170,7 @@ class StompJob extends Job implements JobContract
     /**
      * Release the job back into the queue.
      *
-     * @param  int  $delay
+     * @param int $delay
      * @return void
      */
     public function release($delay = 0)
@@ -200,7 +215,7 @@ class StompJob extends Job implements JobContract
     /**
      * Process an exception that caused the job to fail.
      *
-     * @param  \Throwable|null  $e
+     * @param Throwable|null $e
      * @return void
      */
     protected function failed($e)

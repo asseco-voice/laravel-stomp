@@ -7,7 +7,6 @@ use Asseco\Stomp\Queue\Contracts\HasRawData;
 use Asseco\Stomp\Queue\Jobs\StompJob;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
-use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -48,6 +47,8 @@ class StompQueue extends Queue implements QueueInterface
     protected array $subscribedTo = [];
 
     protected LoggerInterface $log;
+    protected static int $circuitBreaker = 0;
+    protected string $session;
 
     public function __construct(ClientWrapper $stompClient)
     {
@@ -55,6 +56,8 @@ class StompQueue extends Queue implements QueueInterface
         $this->writeQueues = $this->setWriteQueues();
         $this->client = $stompClient->client;
         $this->log = app('stompLog');
+
+        $this->session = $this->client->getClient()->getSessionId();
     }
 
     /**
@@ -93,7 +96,7 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Get the size of the queue.
      *
-     * @param  string|null  $queue
+     * @param string|null $queue
      * @return int
      */
     public function size($queue = null)
@@ -105,9 +108,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue.
      *
-     * @param  string|object  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param string|object $job
+     * @param mixed $data
+     * @param string|null $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
@@ -118,10 +121,10 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a new job onto the queue after a delay.
      *
-     * @param  DateTimeInterface|DateInterval|int  $delay
-     * @param  string|object  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param DateTimeInterface|DateInterval|int $delay
+     * @param string|object $job
+     * @param mixed $data
+     * @param string|null $queue
      * @return mixed
      */
     public function later($delay, $job, $data = '', $queue = null)
@@ -132,9 +135,9 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Push a raw payload onto the queue.
      *
-     * @param  mixed  $payload
-     * @param  string|null  $queue
-     * @param  array  $options
+     * @param mixed $payload
+     * @param string|null $queue
+     * @param array $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -147,20 +150,11 @@ class StompQueue extends Queue implements QueueInterface
 
         $writeQueues = $queue ? $this->parseQueues($queue) : $this->writeQueues;
 
-        /**
-         * @var $payload Message
-         */
-        $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueues,
-        ], true));
-
         return $this->writeToMultipleQueues($writeQueues, $payload);
     }
 
     /**
-     * @param  Frame  $payload
+     * @param Frame $payload
      * @return mixed
      */
     protected function addCorrelationHeader($payload)
@@ -181,8 +175,8 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param  Frame  $payload
-     * @param  string  $header
+     * @param Frame $payload
+     * @param string $header
      * @return bool
      */
     protected function needsHeader($payload, string $header): bool
@@ -204,31 +198,53 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @param  array  $writeQueues
-     * @param  Message  $payload
+     * @param array $writeQueues
+     * @param Message $payload
      * @return bool
-     *
-     * @throws \Stomp\Exception\StompException
      */
     protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
     {
-        $this->checkIfServerAlive();
+        /**
+         * @var $payload Message
+         */
+        $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
+                'body'    => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue'   => $writeQueues,
+            ], true));
 
         $allEventsSent = true;
 
         foreach ($writeQueues as $writeQueue) {
-            $sent = $this->client->send($writeQueue, $payload);
+            $sent = $this->write($writeQueue, $payload);
 
             if (!$sent) {
                 $allEventsSent = false;
-                $this->log->error("[STOMP] Message not sent on queue: $writeQueue");
+                $this->log->error("$this->session [STOMP] Message not sent on queue: $writeQueue");
                 continue;
             }
 
-            $this->log->info("[STOMP] Message sent on queue: $writeQueue");
+            $this->log->info("$this->session [STOMP] Message sent on queue: $writeQueue");
         }
 
         return $allEventsSent;
+    }
+
+    protected function write($queue, Message $payload): bool
+    {
+        // This will write all the events received in a single batch, then send disconnect frame
+        try {
+            $this->log->info("$this->session [STOMP] PUSH queue: '$queue'");
+            $sent = $this->client->send($queue, $payload);
+            $this->log->info("$this->session [STOMP] Message sent successfully? " . ($sent ? 't' : 'f'));
+            return $sent;
+        } catch (Exception) {
+            $this->log->error("$this->session [STOMP] PUSH failed. Reconnecting...");
+            $this->reconnect(false);
+
+            $this->log->info("$this->session [STOMP] Trying to send again...");
+            return $this->write($queue, $payload);
+        }
     }
 
     /**
@@ -237,7 +253,7 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @param $job
      * @param $queue
-     * @param  string  $data
+     * @param string $data
      * @return Message
      */
     protected function createPayload($job, $queue, $data = '')
@@ -266,9 +282,9 @@ class StompQueue extends Queue implements QueueInterface
      * Overridden to support raw data
      * Create a payload array from the given job and data.
      *
-     * @param  object|string  $job
-     * @param  string  $queue
-     * @param  string  $data
+     * @param object|string $job
+     * @param string $queue
+     * @param string $data
      * @return array
      */
     protected function createPayloadArray($job, $queue, $data = '')
@@ -287,7 +303,7 @@ class StompQueue extends Queue implements QueueInterface
     protected function addMissingUuid(array $payload): array
     {
         if (!Arr::has($payload, 'uuid')) {
-            $payload['uuid'] = (string) Str::uuid();
+            $payload['uuid'] = (string)Str::uuid();
         }
 
         return $payload;
@@ -314,24 +330,12 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Pop the next job off of the queue.
      *
-     * @param  string|null  $queue
+     * @param string|null $queue
      * @return Job|null
-     *
-     * @throws \Stomp\Exception\ConnectionException
-     * @throws \Stomp\Exception\StompException
      */
     public function pop($queue = null)
     {
-        $this->checkIfServerAlive();
-        $this->subscribeToQueues();
-
-        try {
-            $frame = $this->client->read();
-        } catch (Exception $e) {
-            $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
-
-            return null;
-        }
+        $frame = $this->read($queue);
 
         if (!($frame instanceof Frame)) {
             return null;
@@ -339,9 +343,138 @@ class StompQueue extends Queue implements QueueInterface
 
         $this->addCorrelationHeader($frame);
 
-        $this->log->info('[STOMP] Popping a job (frame) from queue: ' . print_r($frame, true));
+        $this->log->info("$this->session [STOMP] Popped a job (frame) from queue: " . print_r($frame, true));
 
-        return new StompJob($this->container, $this, $frame, $this->getQueueFromFrame($frame));
+        // This might no longer be relevant. It would happen if pop read CONNECTED frame instead of
+        // MESSAGE one, which was a bug introduced at one point. Keeping it as safety measure
+        $queueFromFrame = $this->getQueueFromFrame($frame);
+
+        if (!$queueFromFrame) {
+            $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
+            return null;
+        }
+
+        return new StompJob($this->container, $this, $frame, $queueFromFrame);
+    }
+
+    protected function read($queue)
+    {
+        // This will read from queue, then push on same session ID if there are events following, then delete event which was read
+        // If job fails, it will be re-pushed on same session ID but with additional headers for redelivery
+        try {
+            $this->log->info("$this->session [STOMP] POP");
+
+            $this->heartbeat();
+            $this->subscribeToQueues();
+
+            $frame = $this->client->read();
+            $this->log->info("$this->session [STOMP] Message read!");
+
+            return $frame;
+        } catch (Exception $e) {
+
+            $this->log->error("$this->session [STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
+            $this->reconnect();
+
+            // Need a recursive call as otherwise it loses the original connection, losing the events in the process
+            // NOT WORKING though...
+            $this->log->info("$this->session [STOMP] Re-reading...");
+
+            return $this->read($queue);
+        }
+    }
+
+    protected function parseQueues(string $queue): array
+    {
+        return explode(';', $queue);
+    }
+
+    protected function getQueueFromFrame(Frame $frame): ?string
+    {
+        // This will return bool when accepting things like CONNECTED frame, we'd just want to
+        $subscription = $this->client->getSubscriptions()->getSubscription($frame);
+
+        return optional($subscription)->getDestination();
+    }
+
+    public function makeDelayHeader(int $delay): array
+    {
+        // TODO: remove ActiveMq hard coding
+        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
+    }
+
+    /**
+     * If these values are left in the header, it will screw up the whole event redelivery
+     * so we need to remove them before sending back to queue.
+     *
+     * @param array $headers
+     * @return array
+     */
+    public function forgetHeadersForRedelivery(array $headers): array
+    {
+        // TODO: remove ActiveMq hard coding
+        $keys = array_keys($headers);
+        $amqMatches = preg_grep('/_AMQ.*/i', $keys);
+
+        Arr::forget($headers, array_merge($amqMatches, ['content-length']));
+
+        return $headers;
+    }
+
+    /**
+     * @throws ConnectionException
+     */
+    protected function heartbeat(): void
+    {
+        $this->client->getClient()->getConnection()->sendAlive();
+        $this->log->info("$this->session [STOMP] Sent alive to {$this->client->getClient()->getSessionId()}");
+    }
+
+    protected function reconnect(bool $subscribe = true)
+    {
+        $this->log->info("$this->session [STOMP] Reconnecting...");
+
+        $this->disconnect();
+
+        try {
+            $this->client->getClient()->connect();
+
+            $this->log->info("$this->session [STOMP] Reconnected successfully.");
+        } catch (Exception $e) {
+            self::$circuitBreaker++;
+            $cb = self::$circuitBreaker;
+
+            $this->log->error("$this->session [STOMP] Failed reconnecting (tries: $cb), retrying in 2s..." . print_r($e->getMessage(), true));
+
+            if (self::$circuitBreaker <= 5) {
+                $this->reconnect($subscribe);
+            }
+
+            $this->log->error("$this->session [STOMP] Circuit breaker executed after $cb tries, exiting.");
+
+            return;
+        }
+
+        // By this point it should be connected, so it is safe to subscribe
+        if ($subscribe) {
+            $this->log->info("$this->session [STOMP] Connected, subscribing...");
+            $this->subscribedTo = [];
+            $this->subscribeToQueues();
+        }
+    }
+
+    public function disconnect()
+    {
+        if (!$this->client->getClient()->isConnected()) {
+            return;
+        }
+
+        try {
+            $this->log->info("$this->session [STOMP] Disconnecting...");
+            $this->client->getClient()->disconnect();
+        } catch (Exception $e) {
+            $this->log->info("$this->session [STOMP] Failed disconnecting: " . print_r($e->getMessage(), true));
+        }
     }
 
     protected function subscribeToQueues(): void
@@ -360,82 +493,5 @@ class StompQueue extends Queue implements QueueInterface
 
             $this->subscribedTo[] = $queue;
         }
-    }
-
-    protected function parseQueues(string $queue): array
-    {
-        return explode(';', $queue);
-    }
-
-    protected function getQueueFromFrame(Frame $frame): string
-    {
-        return $this->client->getSubscriptions()->getSubscription($frame)->getDestination();
-    }
-
-    /**
-     * Close the connection.
-     *
-     * @return void
-     */
-    public function close(): void
-    {
-        $this->client->getClient()->disconnect();
-    }
-
-    public function makeDelayHeader(int $delay): array
-    {
-        // TODO: remove ActiveMq hard coding
-        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
-    }
-
-    /**
-     * If these values are left in the header, it will screw up the whole event redelivery
-     * so we need to remove them before sending back to queue.
-     *
-     * @param  array  $headers
-     * @return array
-     */
-    public function forgetHeadersForRedelivery(array $headers): array
-    {
-        // TODO: remove ActiveMq hard coding
-        $keys = array_keys($headers);
-        $amqMatches = preg_grep('/_AMQ.*/i', $keys);
-
-        Arr::forget($headers, array_merge($amqMatches, ['content-length']));
-
-        return $headers;
-    }
-
-    /**
-     * @return void
-     *
-     * @throws \Stomp\Exception\StompException
-     */
-    protected function checkIfServerAlive(): void
-    {
-        try {
-            $this->client->getClient()->getConnection()->sendAlive();
-        } catch (ConnectionException $e) {
-            $this->log->error('[Stomp] send alive error. Trying to reconnect.' . print_r($e, true));
-            $this->reconnect();
-        }
-    }
-
-    /**
-     * @throws \Stomp\Exception\StompException
-     */
-    protected function reconnect()
-    {
-        $this->flush();
-
-        $connectionWrapper = new ConnectionWrapper();
-        $clientWrapper = new ClientWrapper($connectionWrapper);
-        $this->client = $clientWrapper->client;
-    }
-
-    protected function flush(): void
-    {
-        $this->subscribedTo = [];
-        $this->client->getClient()->disconnect();
     }
 }

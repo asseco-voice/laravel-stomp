@@ -12,7 +12,7 @@ class ClientWrapper
     /**
      * ClientWrapper constructor.
      *
-     * @param  ConnectionWrapper  $connectionWrapper
+     * @param ConnectionWrapper $connectionWrapper
      *
      * @throws \Stomp\Exception\StompException
      */
@@ -24,6 +24,7 @@ class ClientWrapper
         $client->setSync(false);
         $client->setHeartbeat(Config::get('send_heartbeat'), Config::get('receive_heartbeat'));
         $client->setClientId(config('app.name'));
+        $client->setVersions(Config::get('version'));
         $client->connect();
 
         $this->client = new StatefulStomp($client);
