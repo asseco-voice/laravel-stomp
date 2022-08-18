@@ -2,7 +2,6 @@
 
 namespace Asseco\Stomp;
 
-use Asseco\Stomp\Horizon\StompQueue as HorizonStompQueue;
 use Asseco\Stomp\Queue\Connectors\StompConnector;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
@@ -24,10 +23,6 @@ class StompServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/asseco-stomp.php', 'asseco-stomp');
 
         $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
-
-        if (Config::get('worker') == 'horizon') {
-            $this->mergeConfigFrom(__DIR__ . '/../config/horizon.php', 'horizon');
-        }
     }
 
     /**
@@ -42,7 +37,6 @@ class StompServiceProvider extends ServiceProvider
         app()->singleton(ClientWrapper::class);
 
         app()->singleton(StompQueue::class);
-        app()->singleton(HorizonStompQueue::class);
 
         /** @var QueueManager $queue */
         $queue = $this->app['queue'];

@@ -1,5 +1,7 @@
 <?php
 
+use Stomp\Protocol\Version;
+
 return [
 
     'driver'             => 'stomp',
@@ -22,6 +24,11 @@ return [
      */
     'auto_tries'         => env('STOMP_AUTO_TRIES', true),
     'auto_backoff'       => env('STOMP_AUTO_BACKOFF', true),
+
+    /** If all messages should fail on timeout. Set to false in order to revert to default (looking in event payload) */
+    'fail_on_timeout'    => env('STOMP_FAIL_ON_TIMEOUT', true),
+    /** Maximum time in seconds for job execution. This value must be less than send heartbeat in order to run correctly. */
+    'timeout'            => env('STOMP_TIMEOUT', 10),
 
     /**
      * Incremental multiplier for failed job redelivery.
@@ -63,5 +70,10 @@ return [
     /**
      * Heartbeat which we will be sending to server at given millisecond period.
      */
-    'send_heartbeat'  => env('STOMP_SEND_HEARTBEAT', 5000),
+    'send_heartbeat'     => env('STOMP_SEND_HEARTBEAT', 20000),
+
+    /**
+     * Array of supported versions.
+     */
+    'version'            => [Version::VERSION_1_2],
 ];

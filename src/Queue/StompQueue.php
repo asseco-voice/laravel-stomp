@@ -7,7 +7,6 @@ use Asseco\Stomp\Queue\Contracts\HasRawData;
 use Asseco\Stomp\Queue\Jobs\StompJob;
 use Asseco\Stomp\Queue\Stomp\ClientWrapper;
 use Asseco\Stomp\Queue\Stomp\Config;
-use Asseco\Stomp\Queue\Stomp\ConnectionWrapper;
 use Closure;
 use DateInterval;
 use DateTimeInterface;
@@ -48,6 +47,8 @@ class StompQueue extends Queue implements QueueInterface
     protected array $subscribedTo = [];
 
     protected LoggerInterface $log;
+    protected static int $circuitBreaker = 0;
+    protected string $session;
 
     public function __construct(ClientWrapper $stompClient)
     {
@@ -55,6 +56,8 @@ class StompQueue extends Queue implements QueueInterface
         $this->writeQueues = $this->setWriteQueues();
         $this->client = $stompClient->client;
         $this->log = app('stompLog');
+
+        $this->session = $this->client->getClient()->getSessionId();
     }
 
     /**
@@ -147,15 +150,6 @@ class StompQueue extends Queue implements QueueInterface
 
         $writeQueues = $queue ? $this->parseQueues($queue) : $this->writeQueues;
 
-        /**
-         * @var $payload Message
-         */
-        $this->log->info('[STOMP] Pushing stomp payload to queue: ' . print_r([
-            'body'    => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueues,
-        ], true));
-
         return $this->writeToMultipleQueues($writeQueues, $payload);
     }
 
@@ -207,28 +201,52 @@ class StompQueue extends Queue implements QueueInterface
      * @param  array  $writeQueues
      * @param  Message  $payload
      * @return bool
-     *
-     * @throws \Stomp\Exception\StompException
      */
     protected function writeToMultipleQueues(array $writeQueues, Message $payload): bool
     {
-        $this->checkIfServerAlive();
+        /**
+         * @var $payload Message
+         */
+        $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
+            'body'    => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue'   => $writeQueues,
+        ], true));
 
         $allEventsSent = true;
 
         foreach ($writeQueues as $writeQueue) {
-            $sent = $this->client->send($writeQueue, $payload);
+            $sent = $this->write($writeQueue, $payload);
 
             if (!$sent) {
                 $allEventsSent = false;
-                $this->log->error("[STOMP] Message not sent on queue: $writeQueue");
+                $this->log->error("$this->session [STOMP] Message not sent on queue: $writeQueue");
                 continue;
             }
 
-            $this->log->info("[STOMP] Message sent on queue: $writeQueue");
+            $this->log->info("$this->session [STOMP] Message sent on queue: $writeQueue");
         }
 
         return $allEventsSent;
+    }
+
+    protected function write($queue, Message $payload): bool
+    {
+        // This will write all the events received in a single batch, then send disconnect frame
+        try {
+            $this->log->info("$this->session [STOMP] PUSH queue: '$queue'");
+            $sent = $this->client->send($queue, $payload);
+            $this->log->info("$this->session [STOMP] Message sent successfully? " . ($sent ? 't' : 'f'));
+
+            return $sent;
+        } catch (Exception) {
+            $this->log->error("$this->session [STOMP] PUSH failed. Reconnecting...");
+            $this->reconnect(false);
+
+            $this->log->info("$this->session [STOMP] Trying to send again...");
+
+            return $this->write($queue, $payload);
+        }
     }
 
     /**
@@ -316,22 +334,10 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @param  string|null  $queue
      * @return Job|null
-     *
-     * @throws \Stomp\Exception\ConnectionException
-     * @throws \Stomp\Exception\StompException
      */
     public function pop($queue = null)
     {
-        $this->checkIfServerAlive();
-        $this->subscribeToQueues();
-
-        try {
-            $frame = $this->client->read();
-        } catch (Exception $e) {
-            $this->log->error("[STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
-
-            return null;
-        }
+        $frame = $this->read($queue);
 
         if (!($frame instanceof Frame)) {
             return null;
@@ -339,26 +345,44 @@ class StompQueue extends Queue implements QueueInterface
 
         $this->addCorrelationHeader($frame);
 
-        $this->log->info('[STOMP] Popping a job (frame) from queue: ' . print_r($frame, true));
+        $this->log->info("$this->session [STOMP] Popped a job (frame) from queue: " . print_r($frame, true));
 
-        return new StompJob($this->container, $this, $frame, $this->getQueueFromFrame($frame));
+        // This might no longer be relevant. It would happen if pop read CONNECTED frame instead of
+        // MESSAGE one, which was a bug introduced at one point. Keeping it as safety measure
+        $queueFromFrame = $this->getQueueFromFrame($frame);
+
+        if (!$queueFromFrame) {
+            $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
+
+            return null;
+        }
+
+        return new StompJob($this->container, $this, $frame, $queueFromFrame);
     }
 
-    protected function subscribeToQueues(): void
+    protected function read($queue)
     {
-        foreach ($this->readQueues as $queue) {
-            $alreadySubscribed = in_array($queue, $this->subscribedTo);
+        // This will read from queue, then push on same session ID if there are events following, then delete event which was read
+        // If job fails, it will be re-pushed on same session ID but with additional headers for redelivery
+        try {
+            $this->log->info("$this->session [STOMP] POP");
 
-            if ($alreadySubscribed) {
-                continue;
-            }
+            $this->heartbeat();
+            $this->subscribeToQueues();
 
-            $this->client->subscribe($queue, null, 'auto', [
-                // New Artemis version can't work without this as it will consume only first message otherwise.
-                'consumer-window-size' => '-1',
-            ]);
+            $frame = $this->client->read();
+            $this->log->info("$this->session [STOMP] Message read!");
 
-            $this->subscribedTo[] = $queue;
+            return $frame;
+        } catch (Exception $e) {
+            $this->log->error("$this->session [STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
+            $this->reconnect();
+
+            // Need a recursive call as otherwise it loses the original connection, losing the events in the process
+            // NOT WORKING though...
+            $this->log->info("$this->session [STOMP] Re-reading...");
+
+            return $this->read($queue);
         }
     }
 
@@ -367,19 +391,12 @@ class StompQueue extends Queue implements QueueInterface
         return explode(';', $queue);
     }
 
-    protected function getQueueFromFrame(Frame $frame): string
+    protected function getQueueFromFrame(Frame $frame): ?string
     {
-        return $this->client->getSubscriptions()->getSubscription($frame)->getDestination();
-    }
+        // This will return bool when accepting things like CONNECTED frame, we'd just want to
+        $subscription = $this->client->getSubscriptions()->getSubscription($frame);
 
-    /**
-     * Close the connection.
-     *
-     * @return void
-     */
-    public function close(): void
-    {
-        $this->client->getClient()->disconnect();
+        return optional($subscription)->getDestination();
     }
 
     public function makeDelayHeader(int $delay): array
@@ -407,35 +424,76 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * @return void
-     *
-     * @throws \Stomp\Exception\StompException
+     * @throws ConnectionException
      */
-    protected function checkIfServerAlive(): void
+    protected function heartbeat(): void
     {
+        $this->client->getClient()->getConnection()->sendAlive();
+        $this->log->info("$this->session [STOMP] Sent alive to {$this->client->getClient()->getSessionId()}");
+    }
+
+    protected function reconnect(bool $subscribe = true)
+    {
+        $this->log->info("$this->session [STOMP] Reconnecting...");
+
+        $this->disconnect();
+
         try {
-            $this->client->getClient()->getConnection()->sendAlive();
-        } catch (ConnectionException $e) {
-            $this->log->error('[Stomp] send alive error. Trying to reconnect.' . print_r($e, true));
-            $this->reconnect();
+            $this->client->getClient()->connect();
+
+            $this->log->info("$this->session [STOMP] Reconnected successfully.");
+        } catch (Exception $e) {
+            self::$circuitBreaker++;
+            $cb = self::$circuitBreaker;
+
+            $this->log->error("$this->session [STOMP] Failed reconnecting (tries: $cb), retrying in 2s..." . print_r($e->getMessage(), true));
+
+            if (self::$circuitBreaker <= 5) {
+                $this->reconnect($subscribe);
+            }
+
+            $this->log->error("$this->session [STOMP] Circuit breaker executed after $cb tries, exiting.");
+
+            return;
+        }
+
+        // By this point it should be connected, so it is safe to subscribe
+        if ($subscribe) {
+            $this->log->info("$this->session [STOMP] Connected, subscribing...");
+            $this->subscribedTo = [];
+            $this->subscribeToQueues();
         }
     }
 
-    /**
-     * @throws \Stomp\Exception\StompException
-     */
-    protected function reconnect()
+    public function disconnect()
     {
-        $this->flush();
+        if (!$this->client->getClient()->isConnected()) {
+            return;
+        }
 
-        $connectionWrapper = new ConnectionWrapper();
-        $clientWrapper = new ClientWrapper($connectionWrapper);
-        $this->client = $clientWrapper->client;
+        try {
+            $this->log->info("$this->session [STOMP] Disconnecting...");
+            $this->client->getClient()->disconnect();
+        } catch (Exception $e) {
+            $this->log->info("$this->session [STOMP] Failed disconnecting: " . print_r($e->getMessage(), true));
+        }
     }
 
-    protected function flush(): void
+    protected function subscribeToQueues(): void
     {
-        $this->subscribedTo = [];
-        $this->client->getClient()->disconnect();
+        foreach ($this->readQueues as $queue) {
+            $alreadySubscribed = in_array($queue, $this->subscribedTo);
+
+            if ($alreadySubscribed) {
+                continue;
+            }
+
+            $this->client->subscribe($queue, null, 'auto', [
+                // New Artemis version can't work without this as it will consume only first message otherwise.
+                'consumer-window-size' => '-1',
+            ]);
+
+            $this->subscribedTo[] = $queue;
+        }
     }
 }
