@@ -253,8 +253,8 @@ class StompQueue extends Queue implements QueueInterface
      * Overridden to prevent double json encoding/decoding
      * Create a payload string from the given job and data.
      *
-     * @param $job
-     * @param $queue
+     * @param  $job
+     * @param  $queue
      * @param  string  $data
      * @return Message
      */
