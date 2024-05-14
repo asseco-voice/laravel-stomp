@@ -208,9 +208,9 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-            'body'    => $payload->getBody(),
+            'body' => $payload->getBody(),
             'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueues,
+            'queue' => $writeQueues,
         ], true));
 
         $allEventsSent = true;
