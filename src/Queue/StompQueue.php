@@ -505,7 +505,8 @@ class StompQueue extends Queue implements QueueInterface
 
             $this->client->subscribe($queue, null, 'client', [
                 // New Artemis version can't work without this as it will consume only first message otherwise.
-                'consumer-window-size' => '-1',
+                //'consumer-window-size' => '-1',
+                'consumer-window-size' => '2',
             ]);
 
             $this->subscribedTo[] = $queue;
