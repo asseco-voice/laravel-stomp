@@ -501,11 +501,14 @@ class StompQueue extends Queue implements QueueInterface
             if ($alreadySubscribed) {
                 continue;
             }
+			
+			$winSize = Config::get('consumer_window_size') ?? 2;
 
             $this->client->subscribe($queue, null, 'client', [
                 // New Artemis version can't work without this as it will consume only first message otherwise.
                 //'consumer-window-size' => '-1',
-                'consumer-window-size' => '2',
+				// we can define this if we are using ack mode = client
+                'consumer-window-size' => (string)$winSize,
             ]);
 
             $this->subscribedTo[] = $queue;
