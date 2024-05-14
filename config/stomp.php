@@ -71,7 +71,7 @@ return [
      * Heartbeat which we will be sending to server at given millisecond period.
      */
     'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 20000),
-	
+
 	/**
      * Setting consumer-window-size to a value greater than 0 will allow it to receive messages until
      * the cumulative bytes of those messages reaches the configured size.
