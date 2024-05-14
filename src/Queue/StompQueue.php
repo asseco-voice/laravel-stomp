@@ -49,6 +49,8 @@ class StompQueue extends Queue implements QueueInterface
     protected LoggerInterface $log;
     protected static int $circuitBreaker = 0;
     protected string $session;
+	
+	protected $_lastFrame = null;
 
     public function __construct(ClientWrapper $stompClient)
     {
@@ -337,6 +339,13 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
+		
+		if ($this->_lastFrame) {
+            // ACK
+            $this->client->ack($this->_lastFrame);
+			$this->_lastFrame = null;
+        }
+		
         $frame = $this->read($queue);
 
         if (!($frame instanceof Frame)) {
@@ -353,7 +362,6 @@ class StompQueue extends Queue implements QueueInterface
 
         if (!$queueFromFrame) {
             $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
-
             return null;
         }
 
@@ -472,6 +480,13 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         try {
+			
+			if ($this->_lastFrame) {
+				// ACK
+				$this->client->ack($this->_lastFrame);
+				$this->_lastFrame = null;
+			}
+		
             $this->log->info("$this->session [STOMP] Disconnecting...");
             $this->client->getClient()->disconnect();
         } catch (Exception $e) {
@@ -488,7 +503,7 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $this->client->subscribe($queue, null, 'auto', [
+            $this->client->subscribe($queue, null, 'client', [
                 // New Artemis version can't work without this as it will consume only first message otherwise.
                 'consumer-window-size' => '-1',
             ]);
