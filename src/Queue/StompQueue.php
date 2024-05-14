@@ -29,7 +29,10 @@ class StompQueue extends Queue implements QueueInterface
 {
     public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
+
     const CORRELATION = 'X-Correlation-ID';
+
+    const ACK_MODE_CLIENT = 'client';
 
     /**
      * Stomp instance from stomp-php repo.
@@ -50,6 +53,9 @@ class StompQueue extends Queue implements QueueInterface
     protected static int $circuitBreaker = 0;
     protected string $session;
 
+    protected $_lastFrame = null;
+    protected $_ackMode = 'client';
+
     public function __construct(ClientWrapper $stompClient)
     {
         $this->readQueues = $this->setReadQueues();
@@ -58,6 +64,8 @@ class StompQueue extends Queue implements QueueInterface
         $this->log = app('stompLog');
 
         $this->session = $this->client->getClient()->getSessionId();
+
+        $this->_ackMode = strtolower(Config::get('consumer_ack_mode') ?? 'client');
     }
 
     /**
@@ -208,9 +216,9 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-            'body'    => $payload->getBody(),
+            'body' => $payload->getBody(),
             'headers' => $payload->getHeaders(),
-            'queue'   => $writeQueues,
+            'queue' => $writeQueues,
         ], true));
 
         $allEventsSent = true;
@@ -337,6 +345,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
+        $this->ackLastFrameIfNecessary();
+
         $frame = $this->read($queue);
 
         if (!($frame instanceof Frame)) {
@@ -472,6 +482,8 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         try {
+            $this->ackLastFrameIfNecessary();
+
             $this->log->info("$this->session [STOMP] Disconnecting...");
             $this->client->getClient()->disconnect();
         } catch (Exception $e) {
@@ -488,12 +500,32 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $this->client->subscribe($queue, null, 'auto', [
+            $winSize = Config::get('consumer_window_size') ?? 512000;
+            if ($this->_ackMode != self::ACK_MODE_CLIENT) {
+                $winSize = -1;
+            }
+
+            $this->client->subscribe($queue, null, this->_ackMode, [
                 // New Artemis version can't work without this as it will consume only first message otherwise.
-                'consumer-window-size' => '-1',
+                //'consumer-window-size' => '-1',
+                // we can define this if we are using ack mode = client
+                'consumer-window-size' => (string) $winSize,
             ]);
 
             $this->subscribedTo[] = $queue;
+        }
+    }
+
+    /**
+     * If ack mode = client, and we have last frame - send ACK.
+     *
+     * @return void
+     */
+    protected function ackLastFrameIfNecessary()
+    {
+        if ($this->_ackMode == self::ACK_MODE_CLIENT && $this->_lastFrame) {
+            $this->client->ack($this->_lastFrame);
+            $this->_lastFrame = null;
         }
     }
 }

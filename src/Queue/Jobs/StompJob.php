@@ -160,7 +160,7 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         $this->log->info("$this->session [STOMP] Deleting a message from queue: " . print_r([
-            'queue'   => $this->queue,
+            'queue' => $this->queue,
             'message' => $this->frame,
         ], true));
 
