@@ -71,8 +71,8 @@ return [
      * Heartbeat which we will be sending to server at given millisecond period.
      */
     'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 20000),
-	
-	'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 2),
+
+    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 2),
 
     /**
      * Array of supported versions.
