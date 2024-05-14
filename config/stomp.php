@@ -72,7 +72,18 @@ return [
      */
     'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 20000),
 	
-	'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 2),
+	/**
+     * Setting consumer-window-size to a value greater than 0 will allow it to receive messages until
+     * the cumulative bytes of those messages reaches the configured size.
+     * Once that happens the client will not receive any more messages until it sends the appropriate ACK or NACK
+     * frame for the messages it already has.
+     */
+    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 1048576),
+
+    /**
+     * Subscribe mode: auto, client
+     */
+    'consumer_ack_mode' => env('STOMP_CONSUMER_ACK_MODE', 'client'),
 
     /**
      * Array of supported versions.

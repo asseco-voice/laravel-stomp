@@ -29,7 +29,10 @@ class StompQueue extends Queue implements QueueInterface
 {
     public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
-    const CORRELATION = 'X-Correlation-ID';
+    
+	const CORRELATION = 'X-Correlation-ID';
+	
+	const ACK_MODE_CLIENT = 'client';
 
     /**
      * Stomp instance from stomp-php repo.
@@ -51,6 +54,7 @@ class StompQueue extends Queue implements QueueInterface
     protected string $session;
 
     protected $_lastFrame = null;
+	protected $_ackMode = 'client';
 
     public function __construct(ClientWrapper $stompClient)
     {
@@ -60,6 +64,8 @@ class StompQueue extends Queue implements QueueInterface
         $this->log = app('stompLog');
 
         $this->session = $this->client->getClient()->getSessionId();
+		
+		$this->_ackMode = strtolower( Config::get('consumer_ack_mode') ?? 'client' );
     }
 
     /**
@@ -339,11 +345,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
-        if ($this->_lastFrame) {
-            // ACK
-            $this->client->ack($this->_lastFrame);
-            $this->_lastFrame = null;
-        }
+        $this->ackLastFrameIfNecessary();
 
         $frame = $this->read($queue);
 
@@ -480,11 +482,7 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         try {
-            if ($this->_lastFrame) {
-                // ACK
-                $this->client->ack($this->_lastFrame);
-                $this->_lastFrame = null;
-            }
+            $this->ackLastFrameIfNecessary();
 
             $this->log->info("$this->session [STOMP] Disconnecting...");
             $this->client->getClient()->disconnect();
@@ -502,7 +500,10 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 			
-			$winSize = Config::get('consumer_window_size') ?? 2;
+			$winSize = Config::get('consumer_window_size') ?? 512000;
+			if ($this->_ackMode != self::ACK_MODE_CLIENT) {
+                $winSize = -1;
+            }
 
             $this->client->subscribe($queue, null, 'client', [
                 // New Artemis version can't work without this as it will consume only first message otherwise.
@@ -512,6 +513,17 @@ class StompQueue extends Queue implements QueueInterface
             ]);
 
             $this->subscribedTo[] = $queue;
+        }
+    }
+	
+	/**
+     * If ack mode = client, and we have last frame - send ACK
+     * @return void
+     */
+    protected function ackLastFrameIfNecessary() {
+        if ($this->_ackMode == self::ACK_MODE_CLIENT && $this->_lastFrame) {
+            $this->client->ack($this->_lastFrame);
+            $this->_lastFrame = null;
         }
     }
 }
