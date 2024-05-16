@@ -107,6 +107,10 @@ class StompJob extends Job implements JobContract
         $this->log->info("$this->session [STOMP] Executing event...");
 
         $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
+
+        if (Config::get('consumer_ack_mode') == StompQueue::ACK_MODE_CLIENT && $this->frame) {
+            $this->stompQueue->client->ack($this->frame);
+        }
     }
 
     protected function isNativeLaravelJob(): bool
@@ -220,6 +224,11 @@ class StompJob extends Job implements JobContract
      */
     protected function failed($e)
     {
+
+        if (Config::get('consumer_ack_mode') == StompQueue::ACK_MODE_CLIENT && $this->frame) {
+            $this->stompQueue->client->ack($this->frame);
+        }
+
         // External events don't have failed method to call.
         if (!$this->payload || !$this->isNativeLaravelJob()) {
             return;
