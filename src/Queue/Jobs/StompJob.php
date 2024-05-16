@@ -224,7 +224,6 @@ class StompJob extends Job implements JobContract
      */
     protected function failed($e)
     {
-
         if (Config::get('consumer_ack_mode') == StompQueue::ACK_MODE_CLIENT && $this->frame) {
             $this->stompQueue->client->ack($this->frame);
         }
