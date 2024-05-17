@@ -10,6 +10,7 @@ use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
@@ -236,8 +237,13 @@ class StompJob extends Job implements JobContract
 
         [$class, $method] = JobName::parse($this->payload['job']);
 
-        if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-            $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
+        try {
+            if (method_exists($this->instance = $this->resolve($class), 'failed')) {
+                $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
+            }
+        } catch (\Exception $e) {
+            Log::error('Exception in job failing: ' . $e->getMessage());
         }
+
     }
 }
