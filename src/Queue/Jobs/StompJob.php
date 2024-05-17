@@ -243,6 +243,5 @@ class StompJob extends Job implements JobContract
         } catch (\Exception $e) {
             Log::error('Exception in job failing: ' . $e->getMessage());
         }
-
     }
 }
