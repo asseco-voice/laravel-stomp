@@ -364,6 +364,7 @@ class StompQueue extends Queue implements QueueInterface
         if (!$queueFromFrame) {
             $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
             $this->_lastFrame = null;
+
             return null;
         }
 

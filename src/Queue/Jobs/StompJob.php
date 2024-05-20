@@ -114,19 +114,20 @@ class StompJob extends Job implements JobContract
     protected function isNativeLaravelJob(): bool
     {
         $job = Arr::get($this->payload, 'job');
-        return ($job && str_contains($job, 'CallQueuedHandler@call'));
+
+        return $job && str_contains($job, 'CallQueuedHandler@call');
     }
 
-    protected function laravelJobClassExists(): bool {
+    protected function laravelJobClassExists(): bool
+    {
         $eventClassName = Arr::get($this->payload, 'displayName');
         if ($eventClassName) {
             return class_exists($eventClassName);
-        }
-        else {
+        } else {
             $command = Arr::get($this->payload, 'data.command');
             $command = $command ?? unserialize($command);
             /** @var BroadcastEvent $command */
-            if ($command & $command->event && (class_exists(get_class($command->event)))) {
+            if ($command & $command->event && class_exists(get_class($command->event))) {
                 return true;
             }
         }
@@ -139,11 +140,9 @@ class StompJob extends Job implements JobContract
         if ($this->laravelJobClassExists()) {
             [$class, $method] = JobName::parse($this->payload['job']);
             ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data']);
-        }
-        else {
+        } else {
             $this->log->error("$this->session [STOMP] Laravel job class does not exist!");
         }
-
     }
 
     protected function fireExternalJob(): void
