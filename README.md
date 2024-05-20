@@ -44,9 +44,10 @@ topic::queue1;topic::queue2  <-- will read from queue1 and queue2 on the topic
 
 Subscribing with client acknowledgement option (ENV variables):
 
-STOMP_CONSUMER_WIN_SIZE=1024        // number of bytes that Broker will send to client before it expects ACK
+```
+STOMP_CONSUMER_WIN_SIZE=819200      // number of bytes that Broker will send to client before it expects ACK
 STOMP_CONSUMER_ACK_MODE=client		// mode: client (ACK needs to be sent) | auto (no ACK, and window-size has to be -1 in that case)
-
+```
 
 You can see all other available ``.env`` variables, their defaults and usage explanation within 
 the [config file](config/stomp.php). 

@@ -78,7 +78,7 @@ return [
      * Once that happens the client will not receive any more messages until it sends the appropriate ACK or NACK
      * frame for the messages it already has.
      */
-    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 1048576),
+    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 819200),
 
     /**
      * Subscribe mode: auto, client.
