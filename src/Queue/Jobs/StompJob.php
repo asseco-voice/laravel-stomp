@@ -125,8 +125,8 @@ class StompJob extends Job implements JobContract
         else {
             $command = Arr::get($this->payload, 'data.command');
             $command = $command ?? unserialize($command);
-            /** @var BroadcastEvent $comand */
-            if ($command & $comand->event && (class_exists(get_class($comand->event)))) {
+            /** @var BroadcastEvent $command */
+            if ($command & $command->event && (class_exists(get_class($command->event)))) {
                 return true;
             }
         }
