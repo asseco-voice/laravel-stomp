@@ -4,6 +4,7 @@ namespace Asseco\Stomp\Queue\Jobs;
 
 use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\StompQueue;
+use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
@@ -112,13 +113,36 @@ class StompJob extends Job implements JobContract
 
     protected function isNativeLaravelJob(): bool
     {
-        return array_key_exists('job', $this->payload);
+        $job = Arr::get($this->payload, 'job');
+
+        return $job && str_contains($job, 'CallQueuedHandler@call');
+    }
+
+    protected function laravelJobClassExists(): bool
+    {
+        $eventClassName = Arr::get($this->payload, 'displayName');
+        if ($eventClassName) {
+            return class_exists($eventClassName);
+        } else {
+            $command = Arr::get($this->payload, 'data.command');
+            $command = $command ?? unserialize($command);
+            /** @var BroadcastEvent $command */
+            if ($command & $command->event && class_exists(get_class($command->event))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function fireLaravelJob(): void
     {
-        [$class, $method] = JobName::parse($this->payload['job']);
-        ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data']);
+        if ($this->laravelJobClassExists()) {
+            [$class, $method] = JobName::parse($this->payload['job']);
+            ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data']);
+        } else {
+            $this->log->error("$this->session [STOMP] Laravel job class does not exist!");
+        }
     }
 
     protected function fireExternalJob(): void
@@ -241,8 +265,6 @@ class StompJob extends Job implements JobContract
 
     protected function ackIfNecessary()
     {
-        if (Config::get('consumer_ack_mode') == StompQueue::ACK_MODE_CLIENT && $this->frame) {
-            $this->stompQueue->client->ack($this->frame);
-        }
+        $this->stompQueue->ackLastFrameIfNecessary();
     }
 }

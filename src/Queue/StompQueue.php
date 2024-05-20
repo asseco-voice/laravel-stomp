@@ -363,9 +363,12 @@ class StompQueue extends Queue implements QueueInterface
 
         if (!$queueFromFrame) {
             $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
+            $this->_lastFrame = null;
 
             return null;
         }
+
+        $this->_lastFrame = $frame;
 
         return new StompJob($this->container, $this, $frame, $queueFromFrame);
     }
@@ -500,7 +503,7 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $winSize = Config::get('consumer_window_size') ?? 512000;
+            $winSize = Config::get('consumer_window_size') ?? 819200;
             if ($this->_ackMode != self::ACK_MODE_CLIENT) {
                 $winSize = -1;
             }
@@ -521,7 +524,7 @@ class StompQueue extends Queue implements QueueInterface
      *
      * @return void
      */
-    protected function ackLastFrameIfNecessary()
+    public function ackLastFrameIfNecessary()
     {
         if ($this->_ackMode == self::ACK_MODE_CLIENT && $this->_lastFrame) {
             $this->client->ack($this->_lastFrame);
