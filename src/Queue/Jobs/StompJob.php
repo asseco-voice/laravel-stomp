@@ -108,13 +108,11 @@ class StompJob extends Job implements JobContract
     {
         $this->log->info("$this->session [STOMP] Executing event...");
         $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
-        $this->ackIfNecessary();
     }
 
     protected function isNativeLaravelJob(): bool
     {
         $job = Arr::get($this->payload, 'job');
-
         return $job && str_contains($job, 'CallQueuedHandler@call');
     }
 
@@ -185,9 +183,9 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         $this->log->info("$this->session [STOMP] Deleting a message from queue: " . print_r([
-            'queue' => $this->queue,
-            'message' => $this->frame,
-        ], true));
+                'queue' => $this->queue,
+                'message' => $this->frame,
+            ], true));
 
         parent::delete();
     }
@@ -202,9 +200,11 @@ class StompJob extends Job implements JobContract
     {
         parent::release($delay);
 
-        $payload = $this->createStompPayload($delay);
+        if (Config::get('fail_job_requeue')) {
+            $payload = $this->createStompPayload($delay);
+            $this->stompQueue->pushRaw($payload, $this->queue, []);
+        }
 
-        $this->stompQueue->pushRaw($payload, $this->queue, []);
     }
 
     protected function createStompPayload(int $delay): Message
@@ -245,8 +245,6 @@ class StompJob extends Job implements JobContract
      */
     protected function failed($e)
     {
-        $this->ackIfNecessary();
-
         // External events don't have failed method to call.
         if (!$this->payload || !$this->isNativeLaravelJob()) {
             return;
@@ -259,12 +257,8 @@ class StompJob extends Job implements JobContract
                 $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
             }
         } catch (\Exception $e) {
-            Log::error('Exception in job failing: ' . $e->getMessage());
+            $this->log->error('Exception in job failing: ' . $e->getMessage());
         }
     }
 
-    protected function ackIfNecessary()
-    {
-        $this->stompQueue->ackLastFrameIfNecessary();
-    }
 }

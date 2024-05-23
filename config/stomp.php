@@ -25,10 +25,16 @@ return [
     'auto_tries' => env('STOMP_AUTO_TRIES', true),
     'auto_backoff' => env('STOMP_AUTO_BACKOFF', true),
 
+    /*
+     * Will failed job be re-queued ?
+     * We experienced issues with pushing Jobs back to the topic/queue, so we're turning this OFF
+    */
+    'fail_job_requeue' => env('STOMP_FAILED_JOB_REQUEUE', false),
+
     /** If all messages should fail on timeout. Set to false in order to revert to default (looking in event payload) */
     'fail_on_timeout' => env('STOMP_FAIL_ON_TIMEOUT', true),
     /** Maximum time in seconds for job execution. This value must be less than send heartbeat in order to run correctly. */
-    'timeout' => env('STOMP_TIMEOUT', 10),
+    'timeout' => env('STOMP_TIMEOUT', 45),
 
     /**
      * Incremental multiplier for failed job redelivery.
@@ -70,7 +76,7 @@ return [
     /**
      * Heartbeat which we will be sending to server at given millisecond period.
      */
-    'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 20000),
+    'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 50000),
 
     /**
      * Setting consumer-window-size to a value greater than 0 will allow it to receive messages until
@@ -78,7 +84,7 @@ return [
      * Once that happens the client will not receive any more messages until it sends the appropriate ACK or NACK
      * frame for the messages it already has.
      */
-    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 819200),
+    'consumer_window_size' => env('STOMP_CONSUMER_WIN_SIZE', 8192000),
 
     /**
      * Subscribe mode: auto, client.

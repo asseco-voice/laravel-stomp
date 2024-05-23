@@ -21,7 +21,6 @@ class StompServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/asseco-stomp.php', 'asseco-stomp');
-
         $this->mergeConfigFrom(__DIR__ . '/../config/stomp.php', 'queue.connections.stomp');
     }
 
@@ -35,7 +34,6 @@ class StompServiceProvider extends ServiceProvider
         app()->singleton(Config::class);
         app()->singleton(ConnectionWrapper::class);
         app()->singleton(ClientWrapper::class);
-
         app()->singleton(StompQueue::class);
 
         /** @var QueueManager $queue */
@@ -49,7 +47,6 @@ class StompServiceProvider extends ServiceProvider
 
         app()->singleton('stompLog', function ($app) use ($logsEnabled) {
             $logManager = config('asseco-stomp.log_manager');
-
             return $logsEnabled ? new $logManager($app) : new NullLogger();
         });
     }

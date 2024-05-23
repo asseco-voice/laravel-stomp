@@ -50,7 +50,7 @@ class StompQueue extends Queue implements QueueInterface
     protected array $subscribedTo = [];
 
     protected LoggerInterface $log;
-    protected static int $circuitBreaker = 0;
+    protected int $circuitBreaker = 0;
     protected string $session;
 
     protected $_lastFrame = null;
@@ -216,10 +216,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-            'body' => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue' => $writeQueues,
-        ], true));
+                'body' => $payload->getBody(),
+                'headers' => $payload->getHeaders(),
+                'queue' => $writeQueues,
+            ], true));
 
         $allEventsSent = true;
 
@@ -238,7 +238,7 @@ class StompQueue extends Queue implements QueueInterface
         return $allEventsSent;
     }
 
-    protected function write($queue, Message $payload): bool
+    protected function write($queue, Message $payload, $tryAgain=true): bool
     {
         // This will write all the events received in a single batch, then send disconnect frame
         try {
@@ -247,13 +247,15 @@ class StompQueue extends Queue implements QueueInterface
             $this->log->info("$this->session [STOMP] Message sent successfully? " . ($sent ? 't' : 'f'));
 
             return $sent;
-        } catch (Exception) {
-            $this->log->error("$this->session [STOMP] PUSH failed. Reconnecting...");
+        } catch (Exception $e) {
+            $this->log->error("$this->session [STOMP] PUSH failed. Reconnecting... " . $e->getMessage());
             $this->reconnect(false);
 
-            $this->log->info("$this->session [STOMP] Trying to send again...");
+            if ($tryAgain) {
+                $this->log->info("$this->session [STOMP] Trying to send again...");
+                return $this->write($queue, $payload, false);
+            }
 
-            return $this->write($queue, $payload);
         }
     }
 
@@ -453,25 +455,24 @@ class StompQueue extends Queue implements QueueInterface
 
         try {
             $this->client->getClient()->connect();
-
             $this->log->info("$this->session [STOMP] Reconnected successfully.");
         } catch (Exception $e) {
-            self::$circuitBreaker++;
-            $cb = self::$circuitBreaker;
+            $this->circuitBreaker++;
 
-            $this->log->error("$this->session [STOMP] Failed reconnecting (tries: $cb), retrying in 2s..." . print_r($e->getMessage(), true));
+            $this->log->error("$this->session [STOMP] Failed reconnecting (tries: {$this->circuitBreaker}),
+            retrying..." . print_r($e->getMessage(), true));
 
-            if (self::$circuitBreaker <= 5) {
+            if ($this->circuitBreaker <= 5) {
+                usleep(100);
                 $this->reconnect($subscribe);
             }
 
-            $this->log->error("$this->session [STOMP] Circuit breaker executed after $cb tries, exiting.");
-
+            $this->log->error("$this->session [STOMP] Circuit breaker executed after {$this->circuitBreaker} tries, exiting.");
             return;
         }
 
         // By this point it should be connected, so it is safe to subscribe
-        if ($subscribe) {
+        if ($this->client->getClient()->isConnected() && $subscribe) {
             $this->log->info("$this->session [STOMP] Connected, subscribing...");
             $this->subscribedTo = [];
             $this->subscribeToQueues();
@@ -486,7 +487,6 @@ class StompQueue extends Queue implements QueueInterface
 
         try {
             $this->ackLastFrameIfNecessary();
-
             $this->log->info("$this->session [STOMP] Disconnecting...");
             $this->client->getClient()->disconnect();
         } catch (Exception $e) {
@@ -503,7 +503,7 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $winSize = Config::get('consumer_window_size') ?? 819200;
+            $winSize = Config::get('consumer_window_size') ?: 8192000;
             if ($this->_ackMode != self::ACK_MODE_CLIENT) {
                 $winSize = -1;
             }
@@ -531,4 +531,5 @@ class StompQueue extends Queue implements QueueInterface
             $this->_lastFrame = null;
         }
     }
+
 }
