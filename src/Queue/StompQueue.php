@@ -253,6 +253,7 @@ class StompQueue extends Queue implements QueueInterface
 
             if ($tryAgain) {
                 $this->log->info("$this->session [STOMP] Trying to send again...");
+
                 return $this->write($queue, $payload, false);
             }
 
