@@ -216,10 +216,10 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-                'body' => $payload->getBody(),
-                'headers' => $payload->getHeaders(),
-                'queue' => $writeQueues,
-            ], true));
+            'body' => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queue' => $writeQueues,
+        ], true));
 
         $allEventsSent = true;
 
@@ -238,7 +238,7 @@ class StompQueue extends Queue implements QueueInterface
         return $allEventsSent;
     }
 
-    protected function write($queue, Message $payload, $tryAgain=true): bool
+    protected function write($queue, Message $payload, $tryAgain = true): bool
     {
         // This will write all the events received in a single batch, then send disconnect frame
         try {
@@ -253,9 +253,9 @@ class StompQueue extends Queue implements QueueInterface
 
             if ($tryAgain) {
                 $this->log->info("$this->session [STOMP] Trying to send again...");
+
                 return $this->write($queue, $payload, false);
             }
-
         }
     }
 
@@ -468,6 +468,7 @@ class StompQueue extends Queue implements QueueInterface
             }
 
             $this->log->error("$this->session [STOMP] Circuit breaker executed after {$this->circuitBreaker} tries, exiting.");
+
             return;
         }
 
@@ -531,5 +532,4 @@ class StompQueue extends Queue implements QueueInterface
             $this->_lastFrame = null;
         }
     }
-
 }

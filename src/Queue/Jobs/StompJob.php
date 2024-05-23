@@ -11,7 +11,6 @@ use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
@@ -113,6 +112,7 @@ class StompJob extends Job implements JobContract
     protected function isNativeLaravelJob(): bool
     {
         $job = Arr::get($this->payload, 'job');
+
         return $job && str_contains($job, 'CallQueuedHandler@call');
     }
 
@@ -183,9 +183,9 @@ class StompJob extends Job implements JobContract
     public function delete()
     {
         $this->log->info("$this->session [STOMP] Deleting a message from queue: " . print_r([
-                'queue' => $this->queue,
-                'message' => $this->frame,
-            ], true));
+            'queue' => $this->queue,
+            'message' => $this->frame,
+        ], true));
 
         parent::delete();
     }
@@ -204,7 +204,6 @@ class StompJob extends Job implements JobContract
             $payload = $this->createStompPayload($delay);
             $this->stompQueue->pushRaw($payload, $this->queue, []);
         }
-
     }
 
     protected function createStompPayload(int $delay): Message
@@ -260,5 +259,4 @@ class StompJob extends Job implements JobContract
             $this->log->error('Exception in job failing: ' . $e->getMessage());
         }
     }
-
 }

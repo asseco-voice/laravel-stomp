@@ -47,6 +47,7 @@ class StompServiceProvider extends ServiceProvider
 
         app()->singleton('stompLog', function ($app) use ($logsEnabled) {
             $logManager = config('asseco-stomp.log_manager');
+
             return $logsEnabled ? new $logManager($app) : new NullLogger();
         });
     }
