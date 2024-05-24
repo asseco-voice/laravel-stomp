@@ -11,7 +11,6 @@ use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Transport\Frame;
@@ -108,7 +107,6 @@ class StompJob extends Job implements JobContract
     {
         $this->log->info("$this->session [STOMP] Executing event...");
         $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
-        $this->ackIfNecessary();
     }
 
     protected function isNativeLaravelJob(): bool
@@ -202,9 +200,10 @@ class StompJob extends Job implements JobContract
     {
         parent::release($delay);
 
-        $payload = $this->createStompPayload($delay);
-
-        $this->stompQueue->pushRaw($payload, $this->queue, []);
+        if (Config::get('fail_job_requeue')) {
+            $payload = $this->createStompPayload($delay);
+            $this->stompQueue->pushRaw($payload, $this->queue, []);
+        }
     }
 
     protected function createStompPayload(int $delay): Message
@@ -245,8 +244,6 @@ class StompJob extends Job implements JobContract
      */
     protected function failed($e)
     {
-        $this->ackIfNecessary();
-
         // External events don't have failed method to call.
         if (!$this->payload || !$this->isNativeLaravelJob()) {
             return;
@@ -259,12 +256,7 @@ class StompJob extends Job implements JobContract
                 $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
             }
         } catch (\Exception $e) {
-            Log::error('Exception in job failing: ' . $e->getMessage());
+            $this->log->error('Exception in job failing: ' . $e->getMessage());
         }
-    }
-
-    protected function ackIfNecessary()
-    {
-        $this->stompQueue->ackLastFrameIfNecessary();
     }
 }
