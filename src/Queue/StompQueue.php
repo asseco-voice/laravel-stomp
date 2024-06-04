@@ -62,6 +62,8 @@ class StompQueue extends Queue implements QueueInterface
     protected array $_queueNamesForProcessAllQueues = [''];
     protected bool $_customReadQueusDefined = false;
 
+    protected bool $_readMessagesLogToDb = false;
+
     public function __construct(ClientWrapper $stompClient)
     {
         $this->readQueues = $this->setReadQueues();
