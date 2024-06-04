@@ -33,11 +33,13 @@ class Config
         return Str::snake(config('app.name', 'localhost'));
     }
 
-    public static function queueNamesForProcessAllQueues() {
+    public static function queueNamesForProcessAllQueues()
+    {
         return self::get('worker_queue_name_all');
     }
 
-    public static function shouldReadMessagesBeLoggedToDB() {
+    public static function shouldReadMessagesBeLoggedToDB()
+    {
         return self::get('enable_read_events_DB_logs');
     }
 }

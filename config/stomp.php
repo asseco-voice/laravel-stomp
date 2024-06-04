@@ -98,7 +98,7 @@ return [
 
     /**
      * Queue name(s) that represent that all queues should be read
-     * If no queue is specified, Laravel puts 'default' - so this should be entered here
+     * If no queue is specified, Laravel puts 'default' - so this should be entered here.
      */
     'worker_queue_name_all' => explode(';', env('STOMP_CONSUMER_ALL_QUEUES', 'default;')),
 

@@ -7,5 +7,5 @@ return [
 
     'migrations' => [
         'run' => true,
-    ]
+    ],
 ];

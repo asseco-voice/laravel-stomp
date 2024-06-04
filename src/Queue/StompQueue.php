@@ -82,10 +82,10 @@ class StompQueue extends Queue implements QueueInterface
     /**
      * Append queue name to topic/address to avoid random hashes in broker.
      *
-     * @param string|null $queuesString
+     * @param  string|null  $queuesString
      * @return array
      */
-    protected function setReadQueues( ?string $queuesString = ''): array
+    protected function setReadQueues(?string $queuesString = ''): array
     {
         $queuesString = $queuesString ?: Config::readQueues();
         $queues = $this->parseQueues($queuesString);
@@ -227,9 +227,9 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-            'body'      => $payload->getBody(),
-            'headers'   => $payload->getHeaders(),
-            'queues'    => $writeQueues,
+            'body' => $payload->getBody(),
+            'headers' => $payload->getHeaders(),
+            'queues' => $writeQueues,
         ], true));
 
         $allEventsSent = true;
@@ -264,6 +264,7 @@ class StompQueue extends Queue implements QueueInterface
 
             if ($tryAgain) {
                 $this->log->info("$this->session [STOMP] Trying to send again...");
+
                 return $this->write($queue, $payload, false);
             }
 
@@ -359,8 +360,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
-
-        $this->setReadQueuesForWorker( $queue );
+        $this->setReadQueuesForWorker($queue);
 
         $this->ackLastFrameIfNecessary();
 
@@ -381,12 +381,13 @@ class StompQueue extends Queue implements QueueInterface
         if (!$queueFromFrame) {
             $this->log->warning("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
             $this->_lastFrame = null;
+
             return null;
         }
 
         $this->_lastFrame = $frame;
 
-        $this->writeMessageToDBIfNeeded( $frame, $queueFromFrame );
+        $this->writeMessageToDBIfNeeded($frame, $queueFromFrame);
 
         return new StompJob($this->container, $this, $frame, $queueFromFrame);
     }
@@ -514,7 +515,8 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
-     * Subscribe to queues
+     * Subscribe to queues.
+     *
      * @return void
      */
     protected function subscribeToQueues(): void
@@ -550,7 +552,6 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function ackLastFrameIfNecessary()
     {
-
         if ($this->_ackMode == self::ACK_MODE_CLIENT && $this->_lastFrame) {
             $this->log->debug("$this->session [STOMP] ACK-ing last frame. Msg #" . $this->_lastFrame->getMessageId());
             $this->client->ack($this->_lastFrame);
@@ -560,36 +561,38 @@ class StompQueue extends Queue implements QueueInterface
 
     /**
      * Set read queues for queue worker, if queue parameter is defined
-     * > php artisan queue:work --queue=eloquent::live30
-     * @param $queue
+     * > php artisan queue:work --queue=eloquent::live30.
+     *
+     * @param  $queue
      * @return void
      */
-    protected function setReadQueuesForWorker( $queue ) {
-
+    protected function setReadQueuesForWorker($queue)
+    {
         if ($this->_customReadQueusDefined) {
             // already setup
             return;
         }
 
-        $queue = (string)$queue;
-        if (!in_array( $queue, $this->_queueNamesForProcessAllQueues)) {
+        $queue = (string) $queue;
+        if (!in_array($queue, $this->_queueNamesForProcessAllQueues)) {
             // one or more queue
-            $this->readQueues = $this->setReadQueues( $queue );
+            $this->readQueues = $this->setReadQueues($queue);
         }
 
         $this->_customReadQueusDefined = true;
     }
 
-    protected function writeMessageToDBIfNeeded(Frame $frame, $queueFromFrame) {
+    protected function writeMessageToDBIfNeeded(Frame $frame, $queueFromFrame)
+    {
         if ($this->_readMessagesLogToDb) {
             DB::table('stomp_event_logs')->insert(
                 [
-                    'session_id'        => $this->session,
-                    'queue_name'        => $queueFromFrame,
-                    'subscription_id'   => $frame['subscription'],
-                    'message_id'        => $frame->getMessageId(),
-                    'payload'           => print_r($frame, true),
-                    'created_at'        => date('Y-m-d H:i:s.u'),
+                    'session_id' => $this->session,
+                    'queue_name' => $queueFromFrame,
+                    'subscription_id' => $frame['subscription'],
+                    'message_id' => $frame->getMessageId(),
+                    'payload' => print_r($frame, true),
+                    'created_at' => date('Y-m-d H:i:s.u'),
                 ]
             );
         }
