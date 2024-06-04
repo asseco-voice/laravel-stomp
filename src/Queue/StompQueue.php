@@ -18,6 +18,7 @@ use Illuminate\Queue\CallQueuedClosure;
 use Illuminate\Queue\InvalidPayloadException;
 use Illuminate\Queue\Queue;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
 use Stomp\Exception\ConnectionException;
@@ -53,8 +54,13 @@ class StompQueue extends Queue implements QueueInterface
     protected int $circuitBreaker = 0;
     protected string $session;
 
+    /** @var null|Frame */
     protected $_lastFrame = null;
-    protected $_ackMode = 'client';
+
+    protected string $_ackMode = 'client';
+
+    protected array $_queueNamesForProcessAllQueues = [''];
+    protected bool $_customReadQueusDefined = false;
 
     public function __construct(ClientWrapper $stompClient)
     {
@@ -66,25 +72,30 @@ class StompQueue extends Queue implements QueueInterface
         $this->session = $this->client->getClient()->getSessionId();
 
         $this->_ackMode = strtolower(Config::get('consumer_ack_mode') ?? 'client');
+
+        // specify which queue names should be considered as "All queues from Config"
+        // "default" & ""
+        $this->_queueNamesForProcessAllQueues = Config::queueNamesForProcessAllQueues();
+        $this->_readMessagesLogToDb = Config::shouldReadMessagesBeLoggedToDB();
     }
 
     /**
      * Append queue name to topic/address to avoid random hashes in broker.
      *
+     * @param string|null $queuesString
      * @return array
      */
-    protected function setReadQueues(): array
+    protected function setReadQueues( ?string $queuesString = ''): array
     {
-        $queues = $this->parseQueues(Config::readQueues());
+        $queuesString = $queuesString ?: Config::readQueues();
+        $queues = $this->parseQueues($queuesString);
 
         foreach ($queues as &$queue) {
             $default = Config::defaultQueue();
-
             if (!str_contains($queue, self::AMQ_QUEUE_SEPARATOR)) {
                 $queue .= self::AMQ_QUEUE_SEPARATOR . $default . '_' . substr(Str::uuid(), -5);
                 continue;
             }
-
             if (Config::get('prepend_queues')) {
                 $topic = Str::before($queue, self::AMQ_QUEUE_SEPARATOR);
                 $queueName = Str::after($queue, self::AMQ_QUEUE_SEPARATOR);
@@ -216,9 +227,9 @@ class StompQueue extends Queue implements QueueInterface
          * @var $payload Message
          */
         $this->log->info("$this->session [STOMP] Pushing stomp payload to queue: " . print_r([
-            'body' => $payload->getBody(),
-            'headers' => $payload->getHeaders(),
-            'queue' => $writeQueues,
+            'body'      => $payload->getBody(),
+            'headers'   => $payload->getHeaders(),
+            'queues'    => $writeQueues,
         ], true));
 
         $allEventsSent = true;
@@ -253,7 +264,6 @@ class StompQueue extends Queue implements QueueInterface
 
             if ($tryAgain) {
                 $this->log->info("$this->session [STOMP] Trying to send again...");
-
                 return $this->write($queue, $payload, false);
             }
 
@@ -349,6 +359,9 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function pop($queue = null)
     {
+
+        $this->setReadQueuesForWorker( $queue );
+
         $this->ackLastFrameIfNecessary();
 
         $frame = $this->read($queue);
@@ -366,21 +379,20 @@ class StompQueue extends Queue implements QueueInterface
         $queueFromFrame = $this->getQueueFromFrame($frame);
 
         if (!$queueFromFrame) {
-            $this->log->error("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
+            $this->log->warning("$this->session [STOMP] Wrong frame received. Expected MESSAGE, got: " . print_r($frame, true));
             $this->_lastFrame = null;
-
             return null;
         }
 
         $this->_lastFrame = $frame;
+
+        $this->writeMessageToDBIfNeeded( $frame, $queueFromFrame );
 
         return new StompJob($this->container, $this, $frame, $queueFromFrame);
     }
 
     protected function read($queue)
     {
-        // This will read from queue, then push on same session ID if there are events following, then delete event which was read
-        // If job fails, it will be re-pushed on same session ID but with additional headers for redelivery
         try {
             $this->log->info("$this->session [STOMP] POP");
 
@@ -457,7 +469,11 @@ class StompQueue extends Queue implements QueueInterface
 
         try {
             $this->client->getClient()->connect();
+            $newSessionId = $this->client->getClient()->getSessionId();
+
             $this->log->info("$this->session [STOMP] Reconnected successfully.");
+            $this->log->info("$this->session [STOMP] Switching session to: $newSessionId");
+            $this->session = $newSessionId;
         } catch (Exception $e) {
             $this->circuitBreaker++;
 
@@ -475,7 +491,7 @@ class StompQueue extends Queue implements QueueInterface
         }
 
         // By this point it should be connected, so it is safe to subscribe
-        if ($this->client->getClient()->isConnected() && $subscribe) {
+        if ($subscribe && $this->client->getClient()->isConnected()) {
             $this->log->info("$this->session [STOMP] Connected, subscribing...");
             $this->subscribedTo = [];
             $this->subscribeToQueues();
@@ -497,8 +513,18 @@ class StompQueue extends Queue implements QueueInterface
         }
     }
 
+    /**
+     * Subscribe to queues
+     * @return void
+     */
     protected function subscribeToQueues(): void
     {
+        $winSize = Config::get('consumer_window_size') ?: 8192000;
+        if ($this->_ackMode != self::ACK_MODE_CLIENT) {
+            // New Artemis version can't work without this as it will consume only first message otherwise.
+            $winSize = -1;
+        }
+
         foreach ($this->readQueues as $queue) {
             $alreadySubscribed = in_array($queue, $this->subscribedTo);
 
@@ -506,14 +532,9 @@ class StompQueue extends Queue implements QueueInterface
                 continue;
             }
 
-            $winSize = Config::get('consumer_window_size') ?: 8192000;
-            if ($this->_ackMode != self::ACK_MODE_CLIENT) {
-                $winSize = -1;
-            }
+            $this->log->info("$this->session [STOMP] subscribeToQueue `$queue` with ack-mode: {$this->_ackMode} & window-size: $winSize");
 
             $this->client->subscribe($queue, null, $this->_ackMode, [
-                // New Artemis version can't work without this as it will consume only first message otherwise.
-                //'consumer-window-size' => '-1',
                 // we can define this if we are using ack mode = client
                 'consumer-window-size' => (string) $winSize,
             ]);
@@ -529,9 +550,48 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function ackLastFrameIfNecessary()
     {
+
         if ($this->_ackMode == self::ACK_MODE_CLIENT && $this->_lastFrame) {
+            $this->log->debug("$this->session [STOMP] ACK-ing last frame. Msg #" . $this->_lastFrame->getMessageId());
             $this->client->ack($this->_lastFrame);
             $this->_lastFrame = null;
+        }
+    }
+
+    /**
+     * Set read queues for queue worker, if queue parameter is defined
+     * > php artisan queue:work --queue=eloquent::live30
+     * @param $queue
+     * @return void
+     */
+    protected function setReadQueuesForWorker( $queue ) {
+
+        if ($this->_customReadQueusDefined) {
+            // already setup
+            return;
+        }
+
+        $queue = (string)$queue;
+        if (!in_array( $queue, $this->_queueNamesForProcessAllQueues)) {
+            // one or more queue
+            $this->readQueues = $this->setReadQueues( $queue );
+        }
+
+        $this->_customReadQueusDefined = true;
+    }
+
+    protected function writeMessageToDBIfNeeded(Frame $frame, $queueFromFrame) {
+        if ($this->_readMessagesLogToDb) {
+            DB::table('stomp_event_logs')->insert(
+                [
+                    'session_id'        => $this->session,
+                    'queue_name'        => $queueFromFrame,
+                    'subscription_id'   => $frame['subscription'],
+                    'message_id'        => $frame->getMessageId(),
+                    'payload'           => print_r($frame, true),
+                    'created_at'        => date('Y-m-d H:i:s.u'),
+                ]
+            );
         }
     }
 }

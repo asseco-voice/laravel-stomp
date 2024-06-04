@@ -137,7 +137,7 @@ class StompJob extends Job implements JobContract
     {
         if ($this->laravelJobClassExists()) {
             [$class, $method] = JobName::parse($this->payload['job']);
-            ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data']);
+            ($this->instance = $this->resolve($class))->{$method}($this, $this->payload['data'] ?? []);
         } else {
             $this->log->error("$this->session [STOMP] Laravel job class does not exist!");
         }
@@ -253,7 +253,7 @@ class StompJob extends Job implements JobContract
 
         try {
             if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-                $this->instance->failed($this->payload['data'], $e, $this->payload['uuid']);
+                $this->instance->failed($this->payload['data'] ?? [], $e, $this->payload['uuid']);
             }
         } catch (\Exception $e) {
             $this->log->error('Exception in job failing: ' . $e->getMessage());

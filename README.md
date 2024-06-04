@@ -46,7 +46,14 @@ Subscribing with client acknowledgement option (ENV variables):
 
 ```
 STOMP_CONSUMER_WIN_SIZE=819200      // number of bytes that Broker will send to client before it expects ACK
-STOMP_CONSUMER_ACK_MODE=client		// mode: client (ACK needs to be sent) | auto (no ACK, and window-size has to be -1 in that case)
+STOMP_CONSUMER_ACK_MODE=auto		// mode: client (ACK needs to be sent) | auto (no ACK, and window-size has to be -1 in that case)
+```
+
+Options for Laravel worker:
+
+```
+STOMP_CONSUMER_ALL_QUEUES = default;	// which queue name(s) represent that all queues from Config should be read
+STOMP_READ_MESSAGE_DB_LOG = false		// write POP-ed events in DB table `stomp_event_logs`
 ```
 
 You can see all other available ``.env`` variables, their defaults and usage explanation within 

@@ -50,5 +50,14 @@ class StompServiceProvider extends ServiceProvider
 
             return $logsEnabled ? new $logManager($app) : new NullLogger();
         });
+
+
+        if (config('asseco-stomp.migrations.run')) {
+            $this->loadMigrationsFrom(__DIR__ . '/../migrations');
+        }
+
+        $this->publishes([
+            __DIR__ . '/../migrations' => database_path('migrations'),
+        ], 'asseco-stomp');
     }
 }
