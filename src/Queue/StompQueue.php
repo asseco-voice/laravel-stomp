@@ -33,8 +33,8 @@ class StompQueue extends Queue implements QueueInterface
 
     const CORRELATION = 'X-Correlation-ID';
 
-    const ACK_MODE_CLIENT   = 'client';
-    const ACK_MODE_AUTO     = 'auto';
+    const ACK_MODE_CLIENT = 'client';
+    const ACK_MODE_AUTO = 'auto';
 
     /**
      * Stomp instance from stomp-php repo.
