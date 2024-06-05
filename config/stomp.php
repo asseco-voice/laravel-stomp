@@ -33,7 +33,10 @@ return [
 
     /** If all messages should fail on timeout. Set to false in order to revert to default (looking in event payload) */
     'fail_on_timeout' => env('STOMP_FAIL_ON_TIMEOUT', true),
-    /** Maximum time in seconds for job execution. This value must be less than send heartbeat in order to run correctly. */
+
+    /**
+     * Maximum time in seconds for job execution. This value must be less than send heartbeat in order to run correctly.
+     */
     'timeout' => env('STOMP_TIMEOUT', 45),
 
     /**
@@ -55,6 +58,8 @@ return [
      * a way, it becomes unclear which queue is from which service.
      */
     'default_queue' => env('STOMP_DEFAULT_QUEUE'),
+
+    'enable_read_events_DB_logs' => env('STOMP_READ_MESSAGE_DB_LOG', false) === true,
 
     /**
      * Use Laravel logger for outputting logs.
@@ -89,7 +94,13 @@ return [
     /**
      * Subscribe mode: auto, client.
      */
-    'consumer_ack_mode' => env('STOMP_CONSUMER_ACK_MODE', 'client'),
+    'consumer_ack_mode' => env('STOMP_CONSUMER_ACK_MODE', 'auto'),
+
+    /**
+     * Queue name(s) that represent that all queues should be read
+     * If no queue is specified, Laravel puts 'default' - so this should be entered here.
+     */
+    'worker_queue_name_all' => explode(';', env('STOMP_CONSUMER_ALL_QUEUES', 'default;')),
 
     /**
      * Array of supported versions.
