@@ -33,7 +33,8 @@ class StompQueue extends Queue implements QueueInterface
 
     const CORRELATION = 'X-Correlation-ID';
 
-    const ACK_MODE_CLIENT = 'client';
+    const ACK_MODE_CLIENT   = 'client';
+    const ACK_MODE_AUTO     = 'auto';
 
     /**
      * Stomp instance from stomp-php repo.
@@ -57,7 +58,7 @@ class StompQueue extends Queue implements QueueInterface
     /** @var null|Frame */
     protected $_lastFrame = null;
 
-    protected string $_ackMode = 'client';
+    protected string $_ackMode = '';
 
     protected array $_queueNamesForProcessAllQueues = [''];
     protected bool $_customReadQueusDefined = false;
@@ -73,7 +74,7 @@ class StompQueue extends Queue implements QueueInterface
 
         $this->session = $this->client->getClient()->getSessionId();
 
-        $this->_ackMode = strtolower(Config::get('consumer_ack_mode') ?? 'client');
+        $this->_ackMode = strtolower(Config::get('consumer_ack_mode') ?? self::ACK_MODE_AUTO);
 
         // specify which queue names should be considered as "All queues from Config"
         // "default" & ""
@@ -523,7 +524,7 @@ class StompQueue extends Queue implements QueueInterface
      */
     protected function subscribeToQueues(): void
     {
-        $winSize = Config::get('consumer_window_size') ?: 8192000;
+        $winSize = Config::get('consumer_window_size');
         if ($this->_ackMode != self::ACK_MODE_CLIENT) {
             // New Artemis version can't work without this as it will consume only first message otherwise.
             $winSize = -1;
