@@ -51,10 +51,10 @@ class StompJob extends Job implements JobContract
     {
         // Even though payload() decodes it again, this must be left as is because
         // job failure calls this method and we need headers in DB table as well.
-        $body = json_decode($this->frame->getBody(), true);
+        $body = json_decode($this->frame->getBody(), true, 1024);
         $headers = [$this->stompQueue::HEADERS_KEY => $this->headers()];
 
-        return json_encode(array_merge($body, $headers));
+        return json_encode(array_merge($body ?: [], $headers));
     }
 
     public function headers(): array
