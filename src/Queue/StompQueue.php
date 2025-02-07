@@ -210,13 +210,13 @@ class StompQueue extends Queue implements QueueInterface
 
     protected function wrapStompMessage(string $payload): Message
     {
-        $decoded = json_decode($payload, true);
+        $decoded = json_decode($payload, true, 1024);
         $body = Arr::except($decoded, self::HEADERS_KEY);
         $body = $this->addMissingUuid($body);
         $headers = Arr::get($decoded, self::HEADERS_KEY, []);
         $headers = $this->forgetHeadersForRedelivery($headers);
 
-        return new Message(json_encode($body), $headers);
+        return new Message(json_encode($body, depth: 1024), $headers);
     }
 
     /**
@@ -295,7 +295,7 @@ class StompQueue extends Queue implements QueueInterface
         $headers = $this->getHeaders($job);
         $headers = $this->forgetHeadersForRedelivery($headers);
 
-        $message = new Message(json_encode($payload), $headers);
+        $message = new Message(json_encode($payload, depth: 1024), $headers);
 
         if (JSON_ERROR_NONE !== json_last_error()) {
             throw new InvalidPayloadException(
