@@ -54,7 +54,7 @@ class StompJob extends Job implements JobContract
         $body = json_decode($this->frame->getBody(), true, 1024);
         $headers = [$this->stompQueue::HEADERS_KEY => $this->headers()];
 
-        return json_encode(array_merge(is_array($body) ? $body: [], $headers), depth: 1024);
+        return json_encode(array_merge(is_array($body) ? $body : [], $headers), depth: 1024);
     }
 
     public function headers(): array
