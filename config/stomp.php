@@ -74,14 +74,37 @@ return [
     'prepend_queues' => true,
 
     /**
-     * Heartbeat which will be requested from server at given millisecond period.
+     * Heartbeat (ms) we ask the SERVER to send us. Default is now non-zero so the client
+     * can detect a half-open / dropped connection (e.g. an idle connection reaped by a
+     * load balancer or NAT) instead of only finding out on the next failed write
+     * ("Was not possible to write frame!"). 0 disables server heartbeats.
      */
-    'receive_heartbeat' => env('STOMP_RECEIVE_HEARTBEAT', 0),
+    'receive_heartbeat' => env('STOMP_RECEIVE_HEARTBEAT', 20000),
 
     /**
-     * Heartbeat which we will be sending to server at given millisecond period.
+     * Heartbeat (ms) we promise to send the server. The broker derives the connection TTL
+     * from this (Artemis: TTL = send_heartbeat * heartBeatToConnectionTtlModifier, default 2x).
+     * IMPORTANT: keep the job `timeout` comfortably below that TTL — heartbeats are only
+     * flushed between polls, so a long-running job does not heartbeat while it runs.
      */
     'send_heartbeat' => env('STOMP_SEND_HEARTBEAT', 50000),
+
+    /**
+     * Reconnect resilience. On a read/write failure the driver reconnects with capped
+     * exponential backoff + jitter, retrying up to `reconnect_tries`. If it still can't
+     * connect it throws, so the queue worker exits and the supervisor restarts a clean
+     * process (rather than spinning forever as a detached, non-consuming worker).
+     */
+    'reconnect_tries' => env('STOMP_RECONNECT_TRIES', 10),
+    'reconnect_backoff_base_ms' => env('STOMP_RECONNECT_BACKOFF_BASE_MS', 200),
+    'reconnect_backoff_max_ms' => env('STOMP_RECONNECT_BACKOFF_MAX_MS', 30000),
+
+    /**
+     * Socket read timeout in seconds (stomp-php Connection::setReadTimeout). Default 0
+     * keeps the historical non-blocking poll behaviour; set > 0 to let stomp-php service
+     * heartbeats during idle reads.
+     */
+    'read_timeout' => env('STOMP_READ_TIMEOUT', 0),
 
     /**
      * Setting consumer-window-size to a value greater than 0 will allow it to receive messages until

@@ -16,6 +16,8 @@ class ConnectionWrapper
 
         $this->connection = new Connection("$protocol://$host:$port");
 
-        $this->connection->setReadTimeout(0);
+        // Default 0 preserves the historical non-blocking poll behaviour; configurable so
+        // operators can let stomp-php service heartbeats during idle reads.
+        $this->connection->setReadTimeout((int) (Config::get('read_timeout') ?? 0));
     }
 }
