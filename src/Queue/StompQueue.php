@@ -52,7 +52,6 @@ class StompQueue extends Queue implements QueueInterface
     protected array $subscribedTo = [];
 
     protected LoggerInterface $log;
-    protected int $circuitBreaker = 0;
     protected string $session;
 
     /** @var null|Frame */
@@ -151,7 +150,8 @@ class StompQueue extends Queue implements QueueInterface
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
-        return $this->pushRaw($this->createPayload($job, $data, $queue), $queue);
+        // createPayload signature is ($job, $queue, $data); the args were previously swapped here.
+        return $this->pushRaw($this->createPayload($job, $queue, $data), $queue);
     }
 
     /**
@@ -408,14 +408,17 @@ class StompQueue extends Queue implements QueueInterface
 
             return $frame;
         } catch (Exception $e) {
-            $this->log->error("$this->session [STOMP] Stomp failed to read any data from '$queue' queue. " . $e->getMessage());
+            // Single bounded retry: reconnect once, then attempt one more read. Reconnect()
+            // itself does the backed-off retry loop and throws if it can't recover, which
+            // propagates out and stops the worker (supervisor restarts it). The previous
+            // unbounded `return $this->read($queue)` recursion could exhaust the stack on a
+            // down broker and lose the in-flight frame.
+            $this->log->error("$this->session [STOMP] Failed to read from '$queue': " . $e->getMessage() . " — reconnecting once.");
             $this->reconnect();
 
-            // Need a recursive call as otherwise it loses the original connection, losing the events in the process
-            // NOT WORKING though...
-            $this->log->info("$this->session [STOMP] Re-reading...");
+            $this->log->info("$this->session [STOMP] Re-reading after reconnect...");
 
-            return $this->read($queue);
+            return $this->client->read();
         }
     }
 
@@ -465,41 +468,81 @@ class StompQueue extends Queue implements QueueInterface
         $this->log->info("$this->session [STOMP] Sent alive to {$this->client->getClient()->getSessionId()}");
     }
 
-    protected function reconnect(bool $subscribe = true)
+    /**
+     * Re-establish the broker connection with bounded, backed-off retries.
+     *
+     * Replaces the old recursive circuit-breaker, which (a) never reset its counter,
+     * (b) slept only 100us between tries, and (c) on give-up just returned, leaving the
+     * worker spinning as a "running" but permanently-detached consumer. We now retry with real
+     * exponential backoff + jitter, reset implicitly on success, and THROW on final
+     * give-up so the queue worker exits and the supervisor restarts a clean process.
+     *
+     * @throws ConnectionException when reconnection fails after the configured tries
+     */
+    protected function reconnect(bool $subscribe = true): void
     {
         $this->log->info("$this->session [STOMP] Reconnecting...");
 
         $this->disconnect();
 
-        try {
-            $this->client->getClient()->connect();
-            $newSessionId = $this->client->getClient()->getSessionId();
+        // a fresh session has no subscriptions; clear the cache so subscribeToQueues()
+        // actually re-subscribes (the old code only cleared this on the subscribe path,
+        // so a write-triggered reconnect left a consumer silently un-subscribed).
+        $this->subscribedTo = [];
 
-            $this->log->info("$this->session [STOMP] Reconnected successfully.");
-            $this->log->info("$this->session [STOMP] Switching session to: $newSessionId");
-            $this->session = $newSessionId;
-        } catch (Exception $e) {
-            $this->circuitBreaker++;
+        $maxTries = $this->reconnectMaxTries();
+        $baseMs = (int) (Config::get('reconnect_backoff_base_ms') ?? 200);
+        $maxMs = (int) (Config::get('reconnect_backoff_max_ms') ?? 30000);
 
-            $this->log->error("$this->session [STOMP] Failed reconnecting (tries: {$this->circuitBreaker}),
-            retrying..." . print_r($e->getMessage(), true));
+        for ($attempt = 1; $attempt <= $maxTries; $attempt++) {
+            try {
+                $this->client->getClient()->connect();
+                $this->session = $this->client->getClient()->getSessionId();
+                $this->log->info("$this->session [STOMP] Reconnected successfully on attempt $attempt.");
 
-            if ($this->circuitBreaker <= 5) {
-                usleep(100);
-                $this->reconnect($subscribe);
+                if ($subscribe && $this->client->getClient()->isConnected()) {
+                    $this->log->info("$this->session [STOMP] Connected, subscribing...");
+                    $this->subscribeToQueues();
+                }
+
+                return;
+            } catch (Exception $e) {
+                $sleepMs = self::reconnectBackoffMs($attempt, $baseMs, $maxMs) + random_int(0, 250);
+                $this->log->error("$this->session [STOMP] Reconnect attempt $attempt/$maxTries failed: "
+                    . $e->getMessage() . " — retrying in {$sleepMs}ms");
+                usleep($sleepMs * 1000);
             }
-
-            $this->log->error("$this->session [STOMP] Circuit breaker executed after {$this->circuitBreaker} tries, exiting.");
-
-            return;
         }
 
-        // By this point it should be connected, so it is safe to subscribe
-        if ($subscribe && $this->client->getClient()->isConnected()) {
-            $this->log->info("$this->session [STOMP] Connected, subscribing...");
-            $this->subscribedTo = [];
-            $this->subscribeToQueues();
+        // Out of tries: throw so the worker stops and the supervisor restarts it fresh,
+        // rather than silently looping forever as a zombie that consumes nothing.
+        $msg = "$this->session [STOMP] Reconnect failed after $maxTries attempts; aborting worker.";
+        $this->log->error($msg);
+
+        throw new ConnectionException($msg);
+    }
+
+    protected function reconnectMaxTries(): int
+    {
+        $tries = (int) (Config::get('reconnect_tries') ?? 10);
+
+        return $tries > 0 ? $tries : 1;
+    }
+
+    /**
+     * Capped exponential backoff (milliseconds) for reconnect attempt N (1-based).
+     * Pure/deterministic (jitter is added separately at the call site) so it can be
+     * unit-tested without a broker.
+     */
+    public static function reconnectBackoffMs(int $attempt, int $baseMs, int $maxMs): int
+    {
+        if ($attempt < 1) {
+            $attempt = 1;
         }
+
+        $delay = $baseMs * (2 ** ($attempt - 1));
+
+        return (int) min($maxMs, $delay);
     }
 
     public function disconnect()
