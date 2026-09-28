@@ -31,6 +31,9 @@ class StompQueue extends Queue implements QueueInterface
     public const AMQ_QUEUE_SEPARATOR = '::';
     public const HEADERS_KEY = '_headers';
 
+    /** Artemis/ActiveMQ scheduled-delivery header, relative delay in milliseconds. */
+    public const AMQ_SCHEDULED_DELAY = 'AMQ_SCHEDULED_DELAY';
+
     const CORRELATION = 'X-Correlation-ID';
 
     const ACK_MODE_CLIENT = 'client';
@@ -151,7 +154,17 @@ class StompQueue extends Queue implements QueueInterface
     public function later($delay, $job, $data = '', $queue = null)
     {
         // createPayload signature is ($job, $queue, $data); the args were previously swapped here.
-        return $this->pushRaw($this->createPayload($job, $queue, $data), $queue);
+        $payload = $this->createPayload($job, $queue, $data);
+
+        // Hand the delay to the broker (Artemis scheduled delivery). Relative delay rather than
+        // an absolute AMQ_SCHEDULED_TIME: it is immune to clock skew between app and broker.
+        $seconds = $this->secondsUntil($delay);
+
+        if ($seconds > 0) {
+            $payload->addHeaders($this->makeDelayHeader($seconds));
+        }
+
+        return $this->pushRaw($payload, $queue);
     }
 
     /**
@@ -438,7 +451,7 @@ class StompQueue extends Queue implements QueueInterface
     public function makeDelayHeader(int $delay): array
     {
         // TODO: remove ActiveMq hard coding
-        return ['AMQ_SCHEDULED_DELAY' => $delay * 1000];
+        return [self::AMQ_SCHEDULED_DELAY => $delay * 1000];
     }
 
     /**
