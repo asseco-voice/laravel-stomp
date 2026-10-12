@@ -523,12 +523,23 @@ class StompQueue extends Queue implements QueueInterface
                 $sleepMs = self::reconnectBackoffMs($attempt, $baseMs, $maxMs) + random_int(0, 250);
                 $this->log->error("$this->session [STOMP] Reconnect attempt $attempt/$maxTries failed: "
                     . $e->getMessage() . " — retrying in {$sleepMs}ms");
+
+                // A failed connect() leaves stomp-php half-reset (isConnecting=true, no protocol);
+                // in that state it never connects again and the next subscribe dies with an Error.
+                $this->client->getClient()->disconnect();
+
                 usleep($sleepMs * 1000);
             }
         }
 
-        // Out of tries: throw so the worker stops and the supervisor restarts it fresh,
-        // rather than silently looping forever as a zombie that consumes nothing.
+        // Out of tries: stop the worker so the supervisor restarts it fresh, rather than it
+        // looping forever as a zombie that consumes nothing. Laravel's Worker reports whatever
+        // pop() throws and keeps running unless it looks like a lost DB connection, so the
+        // exception alone does not stop it.
+        if (app()->resolved('queue.worker')) {
+            app('queue.worker')->shouldQuit = true;
+        }
+
         $msg = "$this->session [STOMP] Reconnect failed after $maxTries attempts; aborting worker.";
         $this->log->error($msg);
 
