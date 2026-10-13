@@ -25,6 +25,7 @@ use Stomp\Exception\ConnectionException;
 use Stomp\StatefulStomp;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
+use Throwable;
 
 class StompQueue extends Queue implements QueueInterface
 {
@@ -274,7 +275,7 @@ class StompQueue extends Queue implements QueueInterface
             $this->log->info("$this->session [STOMP] Message sent successfully? " . ($sent ? 't' : 'f'));
 
             return $sent;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->log->error("$this->session [STOMP] PUSH failed. Reconnecting... " . $e->getMessage());
             $this->reconnect(false);
 
@@ -420,10 +421,12 @@ class StompQueue extends Queue implements QueueInterface
             $this->log->info("$this->session [STOMP] Message read!");
 
             return $frame;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            // Throwable, not Exception: a half-reset stomp-php client fails with an Error, and
+            // that must reconnect too rather than escape to the Worker on every poll.
             // Single bounded retry: reconnect once, then attempt one more read. Reconnect()
-            // itself does the backed-off retry loop and throws if it can't recover, which
-            // propagates out and stops the worker (supervisor restarts it). The previous
+            // itself does the backed-off retry loop and, if it can't recover, stops the worker
+            // and throws (the supervisor restarts it). The previous
             // unbounded `return $this->read($queue)` recursion could exhaust the stack on a
             // down broker and lose the in-flight frame.
             $this->log->error("$this->session [STOMP] Failed to read from '$queue': " . $e->getMessage() . " — reconnecting once.");
@@ -487,8 +490,9 @@ class StompQueue extends Queue implements QueueInterface
      * Replaces the old recursive circuit-breaker, which (a) never reset its counter,
      * (b) slept only 100us between tries, and (c) on give-up just returned, leaving the
      * worker spinning as a "running" but permanently-detached consumer. We now retry with real
-     * exponential backoff + jitter, reset implicitly on success, and THROW on final
-     * give-up so the queue worker exits and the supervisor restarts a clean process.
+     * exponential backoff + jitter and reset implicitly on success. On final give-up on the
+     * consume path we set the queue worker's shouldQuit (throwing alone does NOT stop it) so it
+     * exits and the supervisor restarts a clean process; either path then throws.
      *
      * @throws ConnectionException when reconnection fails after the configured tries
      */
@@ -519,7 +523,7 @@ class StompQueue extends Queue implements QueueInterface
                 }
 
                 return;
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 $sleepMs = self::reconnectBackoffMs($attempt, $baseMs, $maxMs) + random_int(0, 250);
                 $this->log->error("$this->session [STOMP] Reconnect attempt $attempt/$maxTries failed: "
                     . $e->getMessage() . " — retrying in {$sleepMs}ms");
@@ -527,6 +531,8 @@ class StompQueue extends Queue implements QueueInterface
                 // A failed connect() leaves stomp-php half-reset (isConnecting=true, no protocol);
                 // in that state it never connects again and the next subscribe dies with an Error.
                 $this->client->getClient()->disconnect();
+                // queues this attempt subscribed belong to the dead session
+                $this->subscribedTo = [];
 
                 usleep($sleepMs * 1000);
             }
@@ -535,8 +541,9 @@ class StompQueue extends Queue implements QueueInterface
         // Out of tries: stop the worker so the supervisor restarts it fresh, rather than it
         // looping forever as a zombie that consumes nothing. Laravel's Worker reports whatever
         // pop() throws and keeps running unless it looks like a lost DB connection, so the
-        // exception alone does not stop it.
-        if (app()->resolved('queue.worker')) {
+        // exception alone does not stop it. Only on the consume path: a publish can come from a
+        // worker on another connection (redis, database), which has nothing to reconnect.
+        if ($subscribe && app()->resolved('queue.worker')) {
             app('queue.worker')->shouldQuit = true;
         }
 
