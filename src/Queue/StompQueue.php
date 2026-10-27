@@ -131,6 +131,50 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * Part of the queue contract since Laravel 13; Stomp cannot tell, like size().
+     *
+     * @param  string|null  $queue
+     * @return int
+     */
+    public function pendingSize($queue = null)
+    {
+        return 0;
+    }
+
+    /**
+     * Part of the queue contract since Laravel 13; Stomp cannot tell, like size().
+     *
+     * @param  string|null  $queue
+     * @return int
+     */
+    public function delayedSize($queue = null)
+    {
+        return 0;
+    }
+
+    /**
+     * Part of the queue contract since Laravel 13; Stomp cannot tell, like size().
+     *
+     * @param  string|null  $queue
+     * @return int
+     */
+    public function reservedSize($queue = null)
+    {
+        return 0;
+    }
+
+    /**
+     * Part of the queue contract since Laravel 13; Stomp cannot tell.
+     *
+     * @param  string|null  $queue
+     * @return int|null
+     */
+    public function creationTimeOfOldestPendingJob($queue = null)
+    {
+        return null;
+    }
+
+    /**
      * Push a new job onto the queue.
      *
      * @param  string|object  $job
@@ -296,9 +340,11 @@ class StompQueue extends Queue implements QueueInterface
      * @param  $job
      * @param  $queue
      * @param  string  $data
+     * @param  mixed  $delay  part of the parent signature since Laravel 13; unused, later() schedules
+     *                        the delivery on the broker instead
      * @return Message
      */
-    protected function createPayload($job, $queue, $data = '')
+    protected function createPayload($job, $queue, $data = '', $delay = null)
     {
         if ($job instanceof Closure) {
             $job = CallQueuedClosure::create($job);
