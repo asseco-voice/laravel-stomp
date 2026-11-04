@@ -14,19 +14,25 @@ return [
     'password' => env('STOMP_PASSWORD', 'admin'),
 
     /**
-     * Set to "horizon" if you wish to use Laravel Horizon.
+     * Unused. Laravel Horizon is not supported: it only works with Redis queues (it calls Redis-only
+     * queue methods such as readyNow() and clear()).
      */
     'worker' => env('STOMP_WORKER', 'default'),
 
     /**
-     * Calculate tries and backoff automatically without the need to specify it
-     * in the queue work command.
+     * For jobs that do NOT implement RetriesOnStomp, and only when fail_job_requeue is on:
+     * auto_tries forces max tries to 2 (attempts count from 0, so 3 runs), auto_backoff delays
+     * a re-send by attempt^backoff_multiplier seconds instead of the job's backoff.
+     * Jobs that implement RetriesOnStomp use their own $tries / backoff and ignore these.
      */
     'auto_tries' => env('STOMP_AUTO_TRIES', true),
     'auto_backoff' => env('STOMP_AUTO_BACKOFF', true),
 
     /*
-     * Will failed job be re-queued ?
+     * Will a released job (one that threw, or released itself) be re-sent to its queue?
+     * Applies to jobs that do NOT implement RetriesOnStomp; with it off they are not retried, and
+     * neither failed() nor a failed_jobs row happens. Jobs that implement RetriesOnStomp are always
+     * re-sent while they have attempts left, whatever this says.
      * We experienced issues with pushing Jobs back to the topic/queue, so we're turning this OFF
     */
     'fail_job_requeue' => env('STOMP_FAILED_JOB_REQUEUE', false),
@@ -40,7 +46,7 @@ return [
     'timeout' => env('STOMP_TIMEOUT', 45),
 
     /**
-     * Incremental multiplier for failed job redelivery.
+     * Incremental multiplier for failed job redelivery (auto_backoff, jobs without RetriesOnStomp).
      * Multiplier 2 means that the rescheduled job will be repeated in attempt^2 seconds.
      *
      * For 3 tries this means:
