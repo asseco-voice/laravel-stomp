@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Schema;
 use Mockery;
 use RuntimeException;
 use Stomp\Client;
+use Stomp\Exception\ConnectionException;
+use Stomp\Exception\ErrorFrameException;
+use Stomp\Exception\MissingReceiptException;
 use Stomp\Network\Connection;
 use Stomp\StatefulStomp;
 use Stomp\States\Meta\Subscription;
@@ -33,15 +36,14 @@ abstract class StompWorkerTestCase extends TestCase
 {
     protected const DESTINATION = 'eloquent::eloquent_default_queue';
 
-    /** @var array<int, array{queue: string, message: Message}> */
+    /** @var array<int, array{queue: string, message: Message, receipt: bool}> */
     protected array $sent = [];
 
     /** @var Frame[] */
     protected array $inbox = [];
 
-    protected bool $brokerAccepts = true;
-
-    protected bool $brokerDown = false;
+    /** How the broker answers a send that waits for a receipt: 'receipt', 'error', 'no-receipt' or 'socket'. */
+    protected string $receiptOutcome = 'receipt';
 
     protected int $messageId = 0;
 
@@ -115,15 +117,28 @@ abstract class StompWorkerTestCase extends TestCase
         $stateful->shouldReceive('getSubscriptions')->andReturn($subscriptions);
         $stateful->shouldReceive('subscribe')->andReturnUsing(fn () => $this->subscriptionId);
         $stateful->shouldReceive('read')->andReturnUsing(fn () => array_shift($this->inbox) ?? false);
+        // a plain (async) send: what push(), later() and the fail_job_requeue path use
         $stateful->shouldReceive('send')->andReturnUsing(function (string $queue, Message $message) {
-            if ($this->brokerDown) {
-                throw new RuntimeException('socket gone');
-            }
+            $this->sent[] = ['queue' => $queue, 'message' => $message, 'receipt' => false];
 
-            $this->sent[] = ['queue' => $queue, 'message' => $message];
-
-            return $this->brokerAccepts;
+            return true;
         });
+
+        // a send that waits for the broker's RECEIPT (stomp-php sync send)
+        $client->shouldReceive('send')->andReturnUsing(
+            function (string $queue, Message $message, array $header = [], $sync = null) {
+                $this->sent[] = ['queue' => $queue, 'message' => $message, 'receipt' => $sync === true];
+
+                return match ($this->receiptOutcome) {
+                    'receipt' => true,
+                    'error' => throw new ErrorFrameException(
+                        new Frame('ERROR', ['message' => 'AMQ229032: User does not have permission SEND'])
+                    ),
+                    'no-receipt' => throw new MissingReceiptException('r-1'),
+                    'socket' => throw new ConnectionException('Was not possible to write frame!'),
+                };
+            }
+        );
 
         $wrapper = Mockery::mock(ClientWrapper::class);
         $wrapper->client = $stateful;

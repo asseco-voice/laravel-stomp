@@ -274,8 +274,9 @@ class StompJob extends Job implements JobContract
 
     /**
      * Re-send an opted-in job for its next attempt, to the queue it came from, delayed by the broker for $delay
-     * seconds (the job's own backoff, or the delay it released itself with). If the broker does not take it, the
-     * job is failed so that failed() runs and a failed_jobs row is written, rather than being lost.
+     * seconds (the job's own backoff, or the delay it released itself with). The send waits for the broker's
+     * receipt; if the broker does not confirm it (ERROR frame, no receipt in time, connection failure), the job
+     * is failed so that failed() runs and a failed_jobs row is written, rather than being lost.
      */
     protected function releaseForNextAttempt(int $delay): void
     {
@@ -286,28 +287,20 @@ class StompJob extends Job implements JobContract
         parent::release($delay);
 
         $nextAttempt = $this->attempts() + 1;
-        $cause = null;
 
         try {
-            $sent = $this->stompQueue->pushRaw($this->createNextAttemptPayload($nextAttempt, $delay), $this->queue);
-        } catch (Throwable $e) {
-            $sent = false;
-            $cause = $e;
+            $this->stompQueue->sendWithReceipt($this->queue, $this->createNextAttemptPayload($nextAttempt, $delay));
+        } catch (Throwable $cause) {
+            $this->log->error("$this->session [STOMP] Could not requeue the job for attempt $nextAttempt, failing it.");
+
+            $this->fail(new RequeueFailedException(sprintf(
+                'Could not requeue %s for attempt %d on queue %s: %s',
+                $this->resolveName(),
+                $nextAttempt,
+                $this->queue,
+                $cause->getMessage()
+            ), 0, $cause));
         }
-
-        if ($sent) {
-            return;
-        }
-
-        $this->log->error("$this->session [STOMP] Could not requeue the job for attempt $nextAttempt, failing it.");
-
-        $this->fail(new RequeueFailedException(sprintf(
-            'Could not requeue %s for attempt %d on queue %s%s',
-            $this->resolveName(),
-            $nextAttempt,
-            $this->queue,
-            $cause ? ': ' . $cause->getMessage() : '.'
-        ), 0, $cause));
     }
 
     protected function createNextAttemptPayload(int $attempt, int $delay): Message

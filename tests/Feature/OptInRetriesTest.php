@@ -16,6 +16,7 @@ use Asseco\Stomp\Tests\Support\Retries\SelfReleasingJob;
 use Asseco\Stomp\Tests\Support\Retries\SomethingHappened;
 use Asseco\Stomp\Tests\Support\StompWorkerTestCase;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Support\Facades\Event;
 use RuntimeException;
 use Stomp\Transport\Message;
@@ -155,33 +156,44 @@ class OptInRetriesTest extends StompWorkerTestCase
         $this->assertCount(1, $this->failedJobs());
     }
 
-    public function test_a_re_send_the_broker_refuses_fails_the_job_instead_of_losing_it(): void
+    public function test_a_re_send_waits_for_the_broker_receipt(): void
     {
         $this->dispatchToWorker(new FailingRetryJob(tries: 3));
-        $this->brokerAccepts = false;
 
         $this->work();
 
-        $this->assertCount(1, $this->sent, 'the re-send was attempted');
+        $this->assertTrue($this->takeSent()['receipt'], 'the re-send is a receipt (sync) send');
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function refusedResends(): array
+    {
+        return [
+            'ERROR frame (e.g. no SEND permission)' => ['error', 'AMQ229032'],
+            'no receipt in time' => ['no-receipt', 'r-1'],
+            'connection failure' => ['socket', 'Was not possible to write frame'],
+        ];
+    }
+
+    #[DataProvider('refusedResends')]
+    public function test_a_re_send_the_broker_does_not_confirm_fails_the_job_instead_of_losing_it(
+        string $outcome,
+        string $cause
+    ): void {
+        $this->dispatchToWorker(new FailingRetryJob(tries: 3));
+        $this->receiptOutcome = $outcome;
+
+        $this->work();
+
+        $this->assertCount(1, $this->sent, 'one re-send, no retry loop');
         $this->assertCount(1, Recorder::$failed);
         $this->assertInstanceOf(RequeueFailedException::class, Recorder::$failed[0]);
         $this->assertStringContainsString('attempt 2', Recorder::$failed[0]->getMessage());
+        $this->assertStringContainsString($cause, Recorder::$failed[0]->getMessage());
 
         $failedJobs = $this->failedJobs();
         $this->assertCount(1, $failedJobs);
         $this->assertStringContainsString('attempt 2', $failedJobs[0]->exception);
-    }
-
-    public function test_a_re_send_that_throws_fails_the_job_instead_of_losing_it(): void
-    {
-        $this->dispatchToWorker(new FailingRetryJob(tries: 3));
-        $this->brokerDown = true;
-
-        $this->work();
-
-        $this->assertCount(1, Recorder::$failed);
-        $this->assertInstanceOf(RequeueFailedException::class, Recorder::$failed[0]);
-        $this->assertCount(1, $this->failedJobs());
     }
 
     public function test_a_job_that_releases_itself_is_re_sent_once_with_its_delay(): void
