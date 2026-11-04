@@ -26,6 +26,9 @@ use Stomp\Transport\Message;
  */
 class OptInRetriesTest extends StompWorkerTestCase
 {
+    private const RECEIVED_FRAME_HEADERS = ['subscription', 'message-id', 'ack', 'destination', 'redelivered',
+        'timestamp', 'receipt', 'receipt-id', 'ingress-timestamp'];
+
     public function test_an_opted_in_job_is_on_attempt_one_on_its_first_run(): void
     {
         $this->dispatchToWorker(new FailingRetryJob(tries: 3));
@@ -48,6 +51,34 @@ class OptInRetriesTest extends StompWorkerTestCase
         $this->assertArrayNotHasKey(StompQueue::HEADERS_KEY, $this->body($resent));
         $this->assertSame([], Recorder::$failed);
         $this->assertSame([], $this->failedJobs());
+    }
+
+    public function test_a_re_sent_job_runs_on_a_worker_with_another_subscription(): void
+    {
+        $this->dispatchToWorker(new FailingRetryJob(tries: 2, backoff: 1));
+        $this->work();
+        $resent = $this->takeSent();
+
+        // another replica on the queue, or this worker after a reconnect or restart
+        $this->subscriptionId = 'sub-2';
+        $this->deliver($resent);
+        $this->work();
+
+        $this->assertSame([1, 2], Recorder::$attempts, 'the retry was consumed, not dropped as a wrong frame');
+        $this->assertCount(1, Recorder::$failed);
+    }
+
+    public function test_a_re_send_carries_none_of_the_received_frame_headers(): void
+    {
+        $this->dispatchToWorker(new FailingRetryJob(tries: 3));
+        $this->work();
+
+        $headers = $this->takeSent()['message']->getHeaders();
+
+        foreach (self::RECEIVED_FRAME_HEADERS as $header) {
+            $this->assertArrayNotHasKey($header, $headers);
+        }
+        $this->assertArrayHasKey(StompQueue::CORRELATION, $headers, 'app headers are kept');
     }
 
     public function test_a_backoff_array_gives_the_delay_per_attempt(): void
@@ -231,6 +262,8 @@ class OptInRetriesTest extends StompWorkerTestCase
         $this->assertSame(1, $this->body($resent)['backoff'], 'auto_backoff: 1^2');
         $this->assertSame(1000, $this->delayMs($resent));
         $this->assertSame([], Recorder::$failed);
+        $this->assertArrayNotHasKey('subscription', $resent['message']->getHeaders());
+        $this->assertArrayNotHasKey('message-id', $resent['message']->getHeaders());
     }
 
     public function test_an_external_event_is_never_re_sent(): void

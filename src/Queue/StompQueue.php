@@ -504,6 +504,26 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * Headers of a received MESSAGE frame (or of a RECEIPT) that must not go out again on a SEND. Artemis keeps
+     * every SEND header as a message property and copies it back over the frame's own on delivery, so a stale
+     * `subscription` would make any other consumer (another replica, or this one after a reconnect) drop the
+     * frame as not its own, and a stale `message-id`/`ack` would ack the wrong message. `destination` is set by
+     * the send itself. `expires` and `priority` are kept: they are the sender's, not the delivery's.
+     */
+    public const RECEIVED_FRAME_HEADERS = [
+        'subscription',
+        'message-id',
+        'ack',
+        'destination',
+        'redelivered',
+        'timestamp',
+        'receipt',
+        'receipt-id',
+        'ingress-timestamp',
+        'content-length',
+    ];
+
+    /**
      * If these values are left in the header, it will screw up the whole event redelivery
      * so we need to remove them before sending back to queue.
      *
@@ -516,7 +536,7 @@ class StompQueue extends Queue implements QueueInterface
         $keys = array_keys($headers);
         $amqMatches = preg_grep('/_AMQ.*/i', $keys);
 
-        Arr::forget($headers, array_merge($amqMatches, ['content-length']));
+        Arr::forget($headers, array_merge($amqMatches, self::RECEIVED_FRAME_HEADERS));
 
         return $headers;
     }

@@ -9,6 +9,7 @@ use Asseco\Stomp\Queue\StompQueue;
 use Asseco\Stomp\Tests\Support\Retries\Recorder;
 use Asseco\Stomp\Tests\TestCase;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -23,8 +24,10 @@ use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
 
 /**
- * The real driver and the real `queue:work --once` command run against a mocked stomp-php client. Every frame the driver sends is captured; a captured message is delivered back to
- * the worker as the next MESSAGE frame, the way a broker would hand it out after its scheduled delay.
+ * The real driver and the real `queue:work --once` command run against a mocked stomp-php client. Every frame the
+ * driver sends is captured; a captured message is delivered back to the worker as the next MESSAGE frame, the way
+ * Artemis hands it out: the headers the app sent come back as message properties and win over the frame's own
+ * (subscription, message-id, ...), and the client only takes a frame whose subscription id is its current one.
  */
 abstract class StompWorkerTestCase extends TestCase
 {
@@ -41,6 +44,9 @@ abstract class StompWorkerTestCase extends TestCase
     protected bool $brokerDown = false;
 
     protected int $messageId = 0;
+
+    /** The id of the worker's subscription; another worker, or the same one after a reconnect, has another. */
+    protected string $subscriptionId = 'sub-1';
 
     protected function getEnvironmentSetUp($app)
     {
@@ -100,12 +106,14 @@ abstract class StompWorkerTestCase extends TestCase
         $subscription = Mockery::mock(Subscription::class);
         $subscription->shouldReceive('getDestination')->andReturn(self::DESTINATION);
         $subscriptions = Mockery::mock(SubscriptionList::class);
-        $subscriptions->shouldReceive('getSubscription')->andReturn($subscription);
+        $subscriptions->shouldReceive('getSubscription')->andReturnUsing(
+            fn (Frame $frame) => $frame['subscription'] === $this->subscriptionId ? $subscription : false
+        );
 
         $stateful = Mockery::mock(StatefulStomp::class);
         $stateful->shouldReceive('getClient')->andReturn($client);
         $stateful->shouldReceive('getSubscriptions')->andReturn($subscriptions);
-        $stateful->shouldReceive('subscribe')->andReturn(1);
+        $stateful->shouldReceive('subscribe')->andReturnUsing(fn () => $this->subscriptionId);
         $stateful->shouldReceive('read')->andReturnUsing(fn () => array_shift($this->inbox) ?? false);
         $stateful->shouldReceive('send')->andReturnUsing(function (string $queue, Message $message) {
             if ($this->brokerDown) {
@@ -139,13 +147,19 @@ abstract class StompWorkerTestCase extends TestCase
         return array_shift($this->sent);
     }
 
+    /**
+     * Deliver a sent message like Artemis does: it sets the frame headers, then copies every header the app sent
+     * (stored as message properties) over them. Only `destination` is not copied back.
+     */
     protected function deliver(array $sent): void
     {
-        $this->inbox[] = new Frame('MESSAGE', array_merge($sent['message']->getHeaders(), [
-            'subscription' => '1',
+        $headers = array_merge([
+            'subscription' => $this->subscriptionId,
             'message-id' => 'm-' . ++$this->messageId,
             'destination' => self::DESTINATION,
-        ]), $sent['message']->getBody());
+        ], Arr::except($sent['message']->getHeaders(), ['destination']));
+
+        $this->inbox[] = new Frame('MESSAGE', $headers, $sent['message']->getBody());
     }
 
     protected function work(): void
