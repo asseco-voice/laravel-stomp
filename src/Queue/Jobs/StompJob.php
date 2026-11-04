@@ -166,21 +166,15 @@ class StompJob extends Job implements JobContract
     }
 
     /**
-     * Whether the job can run here, decided from the class of its command (data.commandName), as Laravel does,
-     * falling back to the job handler class. Not from displayName: a job's displayName() can be anything
-     * (QueuedCommand's is the artisan command name), and only the wrappers above put a class name there.
+     * Whether the job can run here, decided from the class of its command (data.commandName), as Laravel does.
+     * Not from displayName: a job's displayName() can be anything (QueuedCommand's is the artisan command name),
+     * and only the wrappers above put a class name there.
      */
     protected function laravelJobClassExists(): bool
     {
         $commandName = Arr::get($this->payload, 'data.commandName');
 
-        if (!is_string($commandName)) {
-            [$handler] = JobName::parse($this->payload['job']);
-
-            return class_exists($handler);
-        }
-
-        if (!class_exists($commandName)) {
+        if (!is_string($commandName) || !class_exists($commandName)) {
             return false;
         }
 

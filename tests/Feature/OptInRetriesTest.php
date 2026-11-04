@@ -280,14 +280,23 @@ class OptInRetriesTest extends StompWorkerTestCase
 
     public function test_an_external_event_is_never_re_sent(): void
     {
-        Event::listen('stomp.eloquent.eloquent_default_queue', function () {
+        $handled = 0;
+        Event::listen('stomp.eloquent.eloquent_default_queue', function () use (&$handled) {
+            $handled++;
+
             throw new RuntimeException('external boom');
         });
 
-        $this->deliver(['message' => new Message(json_encode(['foo' => 'bar']), ['type' => 'external'])]);
+        // not a Laravel job (no CallQueuedHandler), even though its body names an opted-in class
+        $this->deliver(['message' => new Message(json_encode([
+            'displayName' => FailingRetryJob::class,
+            'data' => ['commandName' => FailingRetryJob::class],
+            'maxTries' => 3,
+        ]), ['type' => 'external'])]);
 
         $this->work();
 
+        $this->assertSame(1, $handled, 'the external event was handled');
         $this->assertSame([], $this->sent);
     }
 }
