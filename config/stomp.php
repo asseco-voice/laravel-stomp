@@ -21,8 +21,9 @@ return [
 
     /**
      * For jobs that do NOT implement RetriesOnStomp, and only when fail_job_requeue is on:
-     * auto_tries forces max tries to 2 (attempts count from 0, so 3 runs), auto_backoff delays
-     * a re-send by attempt^backoff_multiplier seconds instead of the job's backoff.
+     * auto_tries forces max tries to 2 (attempts count from 0, so 3 runs); with it off the job's
+     * $tries = N applies, still counted from 0, so N+1 runs. auto_backoff delays a re-send by
+     * attempt^backoff_multiplier seconds instead of the job's backoff.
      * Jobs that implement RetriesOnStomp use their own $tries / backoff and ignore these.
      */
     'auto_tries' => env('STOMP_AUTO_TRIES', true),
