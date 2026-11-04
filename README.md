@@ -160,6 +160,9 @@ SEND permission or a full address, no receipt within stomp-php's receipt wait of
 the job is failed with a ``RequeueFailedException`` ("Could not requeue ... for attempt N: <cause>"), so
 ``failed()`` runs and a ``failed_jobs`` row is written. The re-send is tried once, without a reconnect; the worker
 reconnects on its next poll as usual.
+- A receipt that arrives after the wait still fails the job, although the broker may have queued the retry: the
+job can then run once more (a duplicate run, never a lost one). An ERROR frame left over from an earlier send in the
+same job is read during the wait and also counts as a refusal. Keep retried jobs safe to repeat.
 
 Things to know:
 
@@ -213,7 +216,8 @@ way ``failed()`` runs and a ``failed_jobs`` row is written: the retry is not los
 - **Re-sent messages no longer carry the received frame's headers** (``subscription``, ``message-id``, ``ack``,
 ``redelivered``, ``timestamp``, ...). Artemis copied them back on delivery, so a message re-queued by
 ``STOMP_FAILED_JOB_REQUEUE`` or ``queue:retry`` was dropped as a wrong frame by any worker other than the one
-(and the session) that first received it. This applies to all three re-send paths.
+(and the session) that first received it. This applies to all three re-send paths. The same headers are also left
+out of a first send, so a ``HasHeaders`` job that sets a header with one of these names no longer sends it.
 - **Queued closures, queued artisan commands and jobs with a custom ``displayName()`` now run.** The driver used to
 decide whether a native job could run from ``class_exists()`` on the payload ``displayName``. A job's
 ``displayName()`` can be anything: for ``Artisan::queue()`` it is the command name, and for a queued closure
