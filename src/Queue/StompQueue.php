@@ -310,6 +310,31 @@ class StompQueue extends Queue implements QueueInterface
         return $allEventsSent;
     }
 
+    /**
+     * Send one message and wait for the broker's RECEIPT, so that a broker-side refusal is seen: throws on an
+     * ERROR frame (no SEND permission, address full, ...), on no receipt within the client's receipt wait, or on
+     * a connection failure. Returns only when the broker confirmed the message.
+     *
+     * Single shot, no reconnect: stomp-php buffers MESSAGE frames that arrive while it waits and hands them out
+     * on the next read(), and a reconnect would discard that buffer. A failed connection is recovered by the
+     * next pop(), like any other.
+     *
+     * @throws Throwable when the broker did not confirm the message
+     */
+    public function sendWithReceipt(string $queue, Message $payload): void
+    {
+        $payload = $this->addCorrelationHeader($payload);
+
+        $this->log->info("$this->session [STOMP] PUSH with receipt to queue: '$queue'");
+
+        // the per-call sync flag: the client's own (async) mode is left as it is
+        if ($this->client->getClient()->send($queue, $payload, [], true) !== true) {
+            throw new ConnectionException("The broker did not confirm the message on $queue.");
+        }
+
+        $this->log->info("$this->session [STOMP] Message confirmed by the broker on queue: $queue");
+    }
+
     protected function write($queue, Message $payload, $tryAgain = true): bool
     {
         // This will write all the events received in a single batch, then send disconnect frame
@@ -504,6 +529,26 @@ class StompQueue extends Queue implements QueueInterface
     }
 
     /**
+     * Headers of a received MESSAGE frame (or of a RECEIPT) that must not go out again on a SEND. Artemis keeps
+     * every SEND header as a message property and copies it back over the frame's own on delivery, so a stale
+     * `subscription` would make any other consumer (another replica, or this one after a reconnect) drop the
+     * frame as not its own, and a stale `message-id`/`ack` would ack the wrong message. `destination` is set by
+     * the send itself. `expires` and `priority` are kept: they are the sender's, not the delivery's.
+     */
+    public const RECEIVED_FRAME_HEADERS = [
+        'subscription',
+        'message-id',
+        'ack',
+        'destination',
+        'redelivered',
+        'timestamp',
+        'receipt',
+        'receipt-id',
+        'ingress-timestamp',
+        'content-length',
+    ];
+
+    /**
      * If these values are left in the header, it will screw up the whole event redelivery
      * so we need to remove them before sending back to queue.
      *
@@ -516,7 +561,7 @@ class StompQueue extends Queue implements QueueInterface
         $keys = array_keys($headers);
         $amqMatches = preg_grep('/_AMQ.*/i', $keys);
 
-        Arr::forget($headers, array_merge($amqMatches, ['content-length']));
+        Arr::forget($headers, array_merge($amqMatches, self::RECEIVED_FRAME_HEADERS));
 
         return $headers;
     }

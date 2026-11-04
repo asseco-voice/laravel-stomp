@@ -2,17 +2,23 @@
 
 namespace Asseco\Stomp\Queue\Jobs;
 
+use Asseco\Stomp\Queue\Contracts\RetriesOnStomp;
+use Asseco\Stomp\Queue\Exceptions\RequeueFailedException;
 use Asseco\Stomp\Queue\Stomp\Config;
 use Asseco\Stomp\Queue\StompQueue;
 use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
+use Illuminate\Events\CallQueuedListener;
+use Illuminate\Mail\SendQueuedMailable;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Stomp\Transport\Frame;
 use Stomp\Transport\Message;
 use Throwable;
@@ -21,12 +27,26 @@ class StompJob extends Job implements JobContract
 {
     protected const DEFAULT_TRIES = 2;
 
+    /**
+     * Wrappers whose payload displayName is the class they wrap. A message from another service on a shared
+     * address can wrap a class that does not exist here; it is skipped rather than failing to unserialize.
+     */
+    protected const WRAPPED_CLASS_DISPLAY_NAMES = [
+        BroadcastEvent::class,
+        CallQueuedListener::class,
+        SendQueuedMailable::class,
+        SendQueuedNotifications::class,
+    ];
+
     protected StompQueue $stompQueue;
     protected Frame $frame;
     protected LoggerInterface $log;
     protected string $session;
 
     protected array $payload;
+
+    /** Whether the job opted in with RetriesOnStomp; decided once, from the payload. */
+    protected ?bool $retriesOnStomp = null;
 
     public function __construct(Container $container, StompQueue $stompQueue, Frame $frame, string $queue)
     {
@@ -70,6 +90,10 @@ class StompJob extends Job implements JobContract
      */
     public function maxTries()
     {
+        if ($this->retriesOnStomp()) {
+            return parent::maxTries();
+        }
+
         if (Config::get('auto_tries')) {
             return self::DEFAULT_TRIES;
         }
@@ -109,6 +133,31 @@ class StompJob extends Job implements JobContract
         $this->isNativeLaravelJob() ? $this->fireLaravelJob() : $this->fireExternalJob();
     }
 
+    /**
+     * Whether the job opted in to Laravel retries (RetriesOnStomp): the queued job class, or for a queued
+     * listener the listener class. Read from the payload, without unserializing the command.
+     */
+    public function retriesOnStomp(): bool
+    {
+        return $this->retriesOnStomp ??= $this->resolveRetriesOnStomp();
+    }
+
+    protected function resolveRetriesOnStomp(): bool
+    {
+        if (!$this->isNativeLaravelJob()) {
+            return false;
+        }
+
+        $class = Arr::get($this->payload, 'data.commandName');
+
+        if ($class === CallQueuedListener::class) {
+            // CallQueuedListener::displayName() is the listener class
+            $class = Arr::get($this->payload, 'displayName');
+        }
+
+        return is_string($class) && is_a($class, RetriesOnStomp::class, true);
+    }
+
     protected function isNativeLaravelJob(): bool
     {
         $job = Arr::get($this->payload, 'job');
@@ -116,21 +165,26 @@ class StompJob extends Job implements JobContract
         return $job && str_contains($job, 'CallQueuedHandler@call');
     }
 
+    /**
+     * Whether the job can run here, decided from the class of its command (data.commandName), as Laravel does.
+     * Not from displayName: a job's displayName() can be anything (QueuedCommand's is the artisan command name),
+     * and only the wrappers above put a class name there.
+     */
     protected function laravelJobClassExists(): bool
     {
-        $eventClassName = Arr::get($this->payload, 'displayName');
-        if ($eventClassName) {
-            return class_exists($eventClassName);
-        } else {
-            $command = Arr::get($this->payload, 'data.command');
-            $command = $command ?? unserialize($command);
-            /** @var BroadcastEvent $command */
-            if ($command & $command->event && class_exists(get_class($command->event))) {
-                return true;
-            }
+        $commandName = Arr::get($this->payload, 'data.commandName');
+
+        if (!is_string($commandName) || !class_exists($commandName)) {
+            return false;
         }
 
-        return false;
+        if (in_array($commandName, self::WRAPPED_CLASS_DISPLAY_NAMES, true)) {
+            $wrapped = Arr::get($this->payload, 'displayName');
+
+            return is_string($wrapped) && class_exists($wrapped);
+        }
+
+        return true;
     }
 
     protected function fireLaravelJob(): void
@@ -198,12 +252,70 @@ class StompJob extends Job implements JobContract
      */
     public function release($delay = 0)
     {
+        if ($this->retriesOnStomp()) {
+            $this->releaseForNextAttempt((int) $delay);
+
+            return;
+        }
+
         parent::release($delay);
 
         if (Config::get('fail_job_requeue')) {
             $payload = $this->createStompPayload($delay);
             $this->stompQueue->pushRaw($payload, $this->queue, []);
         }
+    }
+
+    /**
+     * Re-send an opted-in job for its next attempt, to the queue it came from, delayed by the broker for $delay
+     * seconds (the job's own backoff, or the delay it released itself with). The send waits for the broker's
+     * receipt; if the broker does not confirm it (ERROR frame, no receipt in time, connection failure), the job
+     * is failed so that failed() runs and a failed_jobs row is written, rather than being lost.
+     */
+    protected function releaseForNextAttempt(int $delay): void
+    {
+        if ($this->isReleased() || $this->hasFailed()) {
+            return;
+        }
+
+        parent::release($delay);
+
+        $nextAttempt = $this->attempts() + 1;
+
+        try {
+            $this->stompQueue->sendWithReceipt($this->queue, $this->createNextAttemptPayload($nextAttempt, $delay));
+        } catch (Throwable $cause) {
+            $this->log->error("$this->session [STOMP] Could not requeue the job for attempt $nextAttempt, failing it.");
+
+            $this->fail(new RequeueFailedException(sprintf(
+                'Could not requeue %s for attempt %d on queue %s: %s',
+                $this->resolveName(),
+                $nextAttempt,
+                $this->queue,
+                $cause->getMessage()
+            ), 0, $cause));
+        }
+    }
+
+    protected function createNextAttemptPayload(int $attempt, int $delay): Message
+    {
+        $payload = Arr::except($this->payload, $this->stompQueue::HEADERS_KEY);
+        $payload['attempts'] = $attempt;
+
+        $headers = $this->stompQueue->forgetHeadersForRedelivery($this->headers());
+        Arr::forget($headers, StompQueue::AMQ_SCHEDULED_DELAY);
+
+        if ($delay > 0) {
+            $headers = array_merge($headers, $this->stompQueue->makeDelayHeader($delay));
+        }
+
+        $body = json_encode($payload, depth: 1024);
+
+        if ($body === false) {
+            throw new RuntimeException('Unable to JSON encode the payload: ' . json_last_error_msg());
+        }
+
+        return new Message($body, $headers);
     }
 
     protected function createStompPayload(int $delay): Message
@@ -228,6 +340,11 @@ class StompJob extends Job implements JobContract
      */
     public function attempts()
     {
+        if ($this->retriesOnStomp()) {
+            // Laravel's convention: the first run is attempt 1; a re-send carries the number of its attempt.
+            return max(1, (int) Arr::get($this->payload, 'attempts', 0));
+        }
+
         return Arr::get($this->payload, 'attempts', 0);
     }
 
@@ -253,7 +370,10 @@ class StompJob extends Job implements JobContract
 
         try {
             if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-                $this->instance->failed($this->payload['data'] ?? [], $e, $this->payload['uuid']);
+                $this->retriesOnStomp()
+                    // with the job, so the command's failed() sees it (attempts(), batch, ...), as Laravel does
+                    ? $this->instance->failed($this->payload['data'] ?? [], $e, $this->payload['uuid'], $this)
+                    : $this->instance->failed($this->payload['data'] ?? [], $e, $this->payload['uuid']);
             }
         } catch (\Exception $e) {
             $this->log->error('Exception in job failing: ' . $e->getMessage());
