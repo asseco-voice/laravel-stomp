@@ -10,6 +10,8 @@ use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Events\CallQueuedListener;
+use Illuminate\Mail\SendQueuedMailable;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Queue\Jobs\Job;
 use Illuminate\Queue\Jobs\JobName;
 use Illuminate\Support\Arr;
@@ -24,6 +26,17 @@ use Throwable;
 class StompJob extends Job implements JobContract
 {
     protected const DEFAULT_TRIES = 2;
+
+    /**
+     * Wrappers whose payload displayName is the class they wrap. A message from another service on a shared
+     * address can wrap a class that does not exist here; it is skipped rather than failing to unserialize.
+     */
+    protected const WRAPPED_CLASS_DISPLAY_NAMES = [
+        BroadcastEvent::class,
+        CallQueuedListener::class,
+        SendQueuedMailable::class,
+        SendQueuedNotifications::class,
+    ];
 
     protected StompQueue $stompQueue;
     protected Frame $frame;
@@ -152,21 +165,32 @@ class StompJob extends Job implements JobContract
         return $job && str_contains($job, 'CallQueuedHandler@call');
     }
 
+    /**
+     * Whether the job can run here, decided from the class of its command (data.commandName), as Laravel does,
+     * falling back to the job handler class. Not from displayName: a job's displayName() can be anything
+     * (QueuedCommand's is the artisan command name), and only the wrappers above put a class name there.
+     */
     protected function laravelJobClassExists(): bool
     {
-        $eventClassName = Arr::get($this->payload, 'displayName');
-        if ($eventClassName) {
-            return class_exists($eventClassName);
-        } else {
-            $command = Arr::get($this->payload, 'data.command');
-            $command = $command ?? unserialize($command);
-            /** @var BroadcastEvent $command */
-            if ($command & $command->event && class_exists(get_class($command->event))) {
-                return true;
-            }
+        $commandName = Arr::get($this->payload, 'data.commandName');
+
+        if (!is_string($commandName)) {
+            [$handler] = JobName::parse($this->payload['job']);
+
+            return class_exists($handler);
         }
 
-        return false;
+        if (!class_exists($commandName)) {
+            return false;
+        }
+
+        if (in_array($commandName, self::WRAPPED_CLASS_DISPLAY_NAMES, true)) {
+            $wrapped = Arr::get($this->payload, 'displayName');
+
+            return is_string($wrapped) && class_exists($wrapped);
+        }
+
+        return true;
     }
 
     protected function fireLaravelJob(): void
